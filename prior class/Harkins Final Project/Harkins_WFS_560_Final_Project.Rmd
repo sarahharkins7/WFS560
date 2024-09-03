@@ -1,0 +1,1101 @@
+---
+title: "Harkins_Final_Project"
+author: "Sarah Harkins"
+date: "`r Sys.Date()`"
+output: html_document
+---
+```{r}
+library(deSolve)
+library(ggplot2)
+library(bbmle)
+library(MASS)
+library(bbmle)
+```
+
+```{r}
+# Load in the pathogen data
+black_data = read.csv("/Users/harkins/Desktop/560/black_0.05_mg_per_liter.csv")
+green_data = read.csv("/Users/harkins/Desktop/560/green_control.csv")
+red_data = read.csv("/Users/harkins/Desktop/560/red_0.01_mg_per_liter.csv")
+
+head(black_data)
+head(red_data)
+head(green_data)
+```
+```{r}
+#combining data frames to one mega-data frame
+observed_df = data.frame(black_data)
+
+observed_df$red_data_day <- red_data$day
+observed_df$red_data_parasite <- red_data$parasite
+
+observed_df$green_data_day <- green_data$day
+observed_df$green_data_parasite <- green_data$parasite
+
+observed_df
+```
+
+```{r}
+#install.packages("ggplot2") # If you don't already have ggplot
+library(ggplot2)
+
+ggplot(data=observed_df, aes(x=day, y=parasite, color="0.05 mg l^{-1}")) + geom_line() + 
+            geom_point() + 
+  geom_point(aes(x=red_data_day, y=red_data_parasite, color="0.01 mg l^{-1}")) +
+            geom_line(aes(x=red_data_day, y=red_data_parasite, color="0.01 mg l^{-1}")) + 
+  geom_point(aes(x=green_data_day, y=green_data_parasite, color="Control")) +
+            geom_line(aes(x=green_data_day, y=green_data_parasite, color="Control"))
+
+```
+
+
+
+```{r}
+pi_model_HT1 = function(time, state_vars, params){
+  
+  # Extract state variables
+  P = state_vars['P'] #mass of parasites
+  I = state_vars['I'] #immune particles 
+  
+  # Extract the parameters
+  beta = params["beta"]
+  d = params["d"] #death term of immune particles
+  p = params["p"] #rate at which the immune particles kill parasite (predation of parasite by immune particles)
+  B = params["B"] #constant background level of immune particles that are always present with or without disease/parasites present
+  f = params["f"] #rate at which the immune particles are produce due to detected parasite 
+  #ODEs 
+  #I: for immune system acting as the "predator" 
+      #B is baseline level of immune particles
+  #P: the parasite measure in mass 
+  
+  #considering a Holling Type I functional response
+  dP = beta*P - p*I*P
+  dI = B - d*I +f*P*I   
+
+  #try to show delayed pred/prey wave between parasite and immune system 
+  # capture one "wave" over the 30 day experiment 
+  
+  return(list(c(dP, dI)))
+}
+```
+
+```{r}
+pi_model_HT2 = function(time, state_vars, params){
+  
+  # Extract state variables
+  P = state_vars['P'] #mass of parasites
+  I = state_vars['I'] #immune particles 
+  
+  # Extract the parameters
+  beta = params["beta"]
+  d = params["d"] #death term of immune particles
+  #p = params["p"] #rate at which the immune particles kill parasite (predation of parasite by immune particles)
+  B = params["B"] #constant background level of immune particles that are always present with or without disease/parasites present
+  c = params["c"] #max per capita consumption rate 
+  a = params["a"] #1/2 saturation rate
+  b = params["b"] #proportionality constant that "converts" detected parasites into more immune particles 
+  #ODEs 
+  #I: for immune system acting as the "predator" 
+      #B is baseline level of immune particles
+  #P: the parasite measure in mass 
+  
+    #considering a Holling Type II function response 
+  dP = beta*P - I*P*c/(a+P)
+  dI = B - d*I + P*I*b/(a+P) 
+ 
+  return(list(c(dP, dI)))
+}
+```
+
+```{r}
+pi_model_HT3 = function(time, state_vars, params){
+  
+  # Extract state variables
+  P = state_vars['P'] #mass of parasites
+  I = state_vars['I'] #immune particles 
+  
+  # Extract the parameters
+  beta = params["beta"]
+  d = params["d"] #death term of immune particles
+  #p = params["p"] #rate at which the immune particles kill parasite (predation of parasite by immune particles)
+  B = params["B"] #constant background level of immune particles that are always present with or without disease/parasites present
+  c = params["c"] #max per capita consumption rate 
+  a = params["a"] #1/2 saturation rate
+  b = params["b"] #proportionality constant that "converts" detected parasites into more immune particles 
+
+  #ODEs 
+  #I: for immune system acting as the "predator" 
+      #B is baseline level of immune particles
+  #P: he parasite measure in mass 
+  
+  #considering a Holling Type III function response 
+  dP = beta*P - I*P^2*c/(a^2+P^2)
+  dI = B - d*I + I*P^2*b/(a^2+P^2)
+
+  return(list(c(dP, dI)))
+}
+```
+
+
+```{r}
+#function to compute the RSS for a given set of parameters 
+
+rss_pi_HT1 = function(params, data_frame){
+  times = observed_df$green_data_day #times of measurements from observed digitized data
+  
+  # Initial conditions
+  init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+  
+  # Simulate the model.
+  pred = ode(init_vals, times, pi_model_HT1, params)
+  pred_df = data.frame(pred)
+  
+  # Extract B from the model. Don't include the initial value because that is not in the data.
+  predP = pred_df$P
+  
+  # Extract observed data
+  obsP = observed_df$green_data_parasite
+  
+  # Compute residuals
+  errors = obsP - predP
+  
+  rss = sum(errors^2)
+  
+  return(rss)
+}
+```
+
+```{r}
+#function to compute the RSS for a given set of parameters 
+
+rss_pi_HT2 = function(params, data_frame){
+  times = observed_df$green_data_day #times of measurements from observed digitized data
+  
+  # Initial conditions
+  init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+  
+  # Simulate the model.
+  pred = ode(init_vals, times, pi_model_HT2, params)
+  pred_df = data.frame(pred)
+  
+  # Extract B from the model. Don't include the initial value because that is not in the data.
+  predP = pred_df$P
+  
+  # Extract observed data
+  obsP = observed_df$green_data_parasite
+  
+  # Compute residuals
+  errors = obsP - predP
+  
+  rss = sum(errors^2)
+  
+  return(rss)
+}
+```
+
+```{r}
+#function to compute the RSS for a given set of parameters 
+
+rss_pi_HT3 = function(params, data_frame){
+  times = observed_df$green_data_day #times of measurements from observed digitized data
+  
+  # Initial conditions
+  init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+  
+  # Simulate the model.
+  pred = ode(init_vals, times, pi_model_HT3, params)
+  pred_df = data.frame(pred)
+  
+  # Extract B from the model. Don't include the initial value because that is not in the data.
+  predP = pred_df$P
+  
+  # Extract observed data
+  obsP = observed_df$green_data_parasite
+  
+  # Compute residuals
+  errors = obsP - predP
+  
+  rss = sum(errors^2)
+  
+  return(rss)
+}
+```
+
+
+Finding optimal parameters for each system of ODEs then plotting the simulation with those parameters against the observed data from the paper. 
+
+Fitting to the control data: 
+```{r}
+#using optim to find appropriate parameters
+params_HT1 = c(beta=0.11, d = 0.2, p = 0.3 , B = 0.005, f=0.1)
+
+#FOR HOLLINGS TYPE I
+fit0_HT1 = optim(params_HT1, rss_pi_HT1, data=observed_df$green_data_parasite)
+#fit0_HT1$par
+#fit0$convergence
+fit1_HT1 = optim(fit0_HT1$par, rss_pi_HT1, data=observed_df$green_data_parasite, control=list(maxit=10000))
+#fit1_HT1$par
+fit3_HT1 = optim(fit0_HT1$par, rss_pi_HT1, data=observed_df$green_data_parasite, control=list(maxit=10000))
+fit3_HT1$par
+```
+
+```{r}
+times = observed_df$green_data_day #times of measurements from observed digitized data
+  # Initial conditions
+init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+
+pi_results_min_HT1 = ode(init_vals, times, pi_model_HT1, fit3_HT1$par) # fit0_HT1$par
+
+pi_results_min_df_HT1 = data.frame(pi_results_min_HT1)
+#pi_results_min_df_HT1
+
+ggplot() + geom_line(aes(x=pi_results_min_df_HT1$time, y=pi_results_min_df_HT1$P, color='Optimized Parameters'))+
+      geom_point(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data"))+
+  ylab("Population") + xlab("Time")
+```
+
+
+```{r}
+params_HT2 = c(beta=0.1, d = 0.2, B = 0.005, a = 2.6, c = 0.7, b=0.1)
+
+
+#FOR HOLLINGS TYPE II
+fit0_HT2 = optim(params_HT2, rss_pi_HT2, data=observed_df$green_data_parasite, control=list(maxit=10000))
+#fit0_HT2$par
+#fit0$convergence
+fit1_HT2 = optim(fit0_HT2$par, rss_pi_HT2, data=observed_df$green_data_parasite)
+#fit1_HT2$par
+fit3_HT2 = optim(fit1_HT2$par, rss_pi_HT2, data=observed_df$green_data_parasite)
+fit3_HT2$par
+#fit0_HT2$par
+```
+
+```{r}
+#RSS of the Holling type II model 
+rss_pi_HT2(fit0_HT2$par,observed_df$green_data_parasite )
+```
+
+```{r}
+times = observed_df$green_data_day #times of measurements from observed digitized data
+  # Initial conditions
+init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+
+pi_results_min_HT2 = ode(init_vals, times, pi_model_HT2, fit3_HT2$par)
+
+pi_results_min_df_HT2 = data.frame(pi_results_min_HT2)
+#pi_results_min_df_HT2
+
+ggplot() + geom_line(aes(x=pi_results_min_df_HT2$time, y=pi_results_min_df_HT2$P, color='Optimized Parameters'))+
+      geom_point(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data"))+
+  ylab("Population") + xlab("Time")
+```
+
+```{r}
+params_HT3 = c(beta=0.1, d = 0.2 , B = 0.005, a = 2.6, c = 0.7, b=0.1)
+
+#FOR HOLLINGS TYPE III
+fit0_HT3  = optim(params_HT3, rss_pi_HT3, data=observed_df$green_data_parasite, method="L-BFGS-B", lower=c(d=0), upper=c(d=3))
+#fit0_HT3$par
+#fit0$convergence
+fit1_HT3 = optim(fit0_HT3$par, rss_pi_HT3, data=observed_df$green_data_parasite)
+#fit1_HT3$par
+fit3_HT3 = optim(fit1_HT3$par, rss_pi_HT3, data=observed_df$green_data_parasite)
+fit3_HT3$par
+```
+
+```{r}
+#RSS of the Holling type III model 
+rss_pi_HT3(fit3_HT3$par, observed_df$green_data_parasite)
+```
+
+
+```{r}
+times = observed_df$green_data_day #times of measurements from observed digitized data
+  # Initial conditions
+init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+
+pi_results_min_HT3 = ode(init_vals, times, pi_model_HT3, fit0_HT3$par)
+
+pi_results_min_df_HT3 = data.frame(pi_results_min_HT3)
+#pi_results_min_df_HT3
+
+ggplot() + geom_line(aes(x=pi_results_min_df_HT3$time, y=pi_results_min_df_HT3$P, color='Optimized Parameters'))+
+      geom_point(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data"))+
+  ylab("Population") + xlab("Time")
+```
+
+Fitting to the data for the 0.01 mg l^-1 microplastics ("red" data): 
+
+```{r}
+#function to compute the RSS for a given set of parameters 
+
+rss_pi_HT1_0.01 = function(params, data_frame){
+  times = observed_df$red_data_day #times of measurements from observed digitized data
+  
+  # Initial conditions
+  init_vals = c(P= observed_df$red_data_parasite[1], I = 0.1)
+  
+  # Simulate the model.
+  pred = ode(init_vals, times, pi_model_HT1, params)
+  pred_df = data.frame(pred)
+  
+  # Extract B from the model. Don't include the initial value because that is not in the data.
+  predP = pred_df$P
+  
+  # Extract observed data
+  obsP = observed_df$red_data_parasite
+  
+  # Compute residuals
+  errors = obsP - predP
+  
+  rss = sum(errors^2)
+  
+  return(rss)
+}
+```
+
+```{r}
+#function to compute the RSS for a given set of parameters 
+
+rss_pi_HT2_0.01 = function(params, data_frame){
+  times = observed_df$red_data_day #times of measurements from observed digitized data
+  
+  # Initial conditions
+  init_vals = c(P= observed_df$red_data_parasite[1], I = 0.1)
+  
+  # Simulate the model.
+  pred = ode(init_vals, times, pi_model_HT2, params)
+  pred_df = data.frame(pred)
+  
+  # Extract B from the model. Don't include the initial value because that is not in the data.
+  predP = pred_df$P
+  
+  # Extract observed data
+  obsP = observed_df$red_data_parasite
+  
+  # Compute residuals
+  errors = obsP - predP
+  
+  rss = sum(errors^2)
+  
+  return(rss)
+}
+```
+
+```{r}
+#function to compute the RSS for a given set of parameters 
+
+rss_pi_HT3_0.01 = function(params, data_frame){
+  times = observed_df$red_data_day #times of measurements from observed digitized data
+  
+  # Initial conditions
+  init_vals = c(P= observed_df$red_data_parasite[1], I = 0.1)
+  
+  # Simulate the model.
+  pred = ode(init_vals, times, pi_model_HT3, params)
+  pred_df = data.frame(pred)
+  
+  # Extract B from the model. Don't include the initial value because that is not in the data.
+  predP = pred_df$P
+  
+  # Extract observed data
+  obsP = observed_df$red_data_parasite
+  
+  # Compute residuals
+  errors = obsP - predP
+  
+  rss = sum(errors^2)
+  
+  return(rss)
+}
+```
+
+```{r}
+#using optim to find appropriate parameters
+params_HT1_red = c(beta=0.11, d = 0.2, p = 0.3 , B = 0.005, f=0.1)
+
+#FOR HOLLINGS TYPE I
+fit0_HT1_red = optim(params_HT1_red, rss_pi_HT1_0.01, data=observed_df$red_data_parasite)
+#fit0_HT1$par
+#fit0$convergence
+fit1_HT1_red = optim(fit0_HT1_red$par, rss_pi_HT1_0.01, data=observed_df$red_data_parasite, control=list(maxit=10000))
+#fit1_HT1$par
+fit3_HT1_red = optim(fit0_HT1_red$par, rss_pi_HT1_0.01, data=observed_df$red_data_parasite, control=list(maxit=10000))
+fit3_HT1_red$par
+```
+
+```{r}
+times_red = observed_df$red_data_day #times of measurements from observed digitized data
+  # Initial conditions
+init_vals_red = c(P= observed_df$red_data_parasite[1], I = 0.1)
+#init_vals_red
+
+pi_results_min_HT1_red = ode(init_vals_red, times_red, pi_model_HT1, fit3_HT1_red$par) 
+#pi_results_min_HT1_red
+
+pi_results_min_df_HT1_red = data.frame(pi_results_min_HT1_red)
+#pi_results_min_df_HT1_red
+
+ggplot() + geom_line(aes(x=pi_results_min_df_HT1_red$time, y=pi_results_min_df_HT1_red$P, color='Optimized Parameters'))+
+      geom_point(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data"))+
+  ylab("Population") + xlab("Time")
+```
+
+
+```{r}
+params_HT2 = c(beta=0.1, d = 0.2, B = 0.005, a = 2.6, c = 0.7, b=0.1)
+
+
+#FOR HOLLINGS TYPE II
+fit0_HT2_red = optim(params_HT2, rss_pi_HT2_0.01, data=observed_df$red_data_parasite, control=list(maxit=10000))
+#fit0_HT2$par
+#fit0$convergence
+fit1_HT2_red = optim(fit0_HT2_red$par, rss_pi_HT2_0.01, data=observed_df$red_data_parasite)
+#fit1_HT2$par
+fit3_HT2_red = optim(fit1_HT2_red$par, rss_pi_HT2_0.01, data=observed_df$red_data_parasite)
+fit3_HT2_red$par
+#fit0_HT2_red$par
+```
+
+```{r}
+#RSS of the Holling type II model 
+rss_pi_HT2_0.01(fit0_HT2_red$par,observed_df$red_data_parasite )
+```
+
+```{r}
+times_red = observed_df$red_data_day #times of measurements from observed digitized data
+  # Initial conditions
+init_vals_red = c(P= observed_df$red_data_parasite[1], I = 0.1)
+
+pi_results_min_HT2_red  = ode(init_vals_red, times_red, pi_model_HT2, fit3_HT2_red$par)
+
+pi_results_min_df_HT2_red  = data.frame(pi_results_min_HT2_red )
+#pi_results_min_df_HT2
+
+ggplot() + geom_line(aes(x=pi_results_min_df_HT2_red$time, y=pi_results_min_df_HT2_red$P, color='Optimized Parameters'))+
+      geom_point(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data"))+
+  ylab("Population") + xlab("Time")
+```
+
+
+
+```{r}
+params_HT3_red = c(beta=0.1, d = 0.2 , B = 0.005, a = 2.6, c = 0.7, b=0.1)
+
+#FOR HOLLINGS TYPE III
+fit0_HT3_red  = optim(params_HT3_red, rss_pi_HT3_0.01, data=observed_df$red_data_parasite, method="L-BFGS-B", lower=c(d=0), upper=c(d=3))
+#fit0_HT3$par
+#fit0$convergence
+fit1_HT3_red = optim(fit0_HT3_red$par, rss_pi_HT3_0.01, data=observed_df$red_data_parasite)
+#fit1_HT3$par
+fit3_HT3_red = optim(fit1_HT3_red$par, rss_pi_HT3_0.01, data=observed_df$red_data_parasite)
+fit3_HT3_red$par
+```
+
+```{r}
+#RSS of the Holling type III model 
+rss_pi_HT3_0.01(fit3_HT3_red$par, observed_df$red_data_parasite)
+```
+
+
+```{r}
+times_red = observed_df$green_data_day #times of measurements from observed digitized data
+  # Initial conditions
+init_vals_red = c(P= observed_df$red_data_parasite[1], I = 0.1)
+
+pi_results_min_HT3_red = ode(init_vals_red, times_red, pi_model_HT3, fit3_HT3_red$par)
+
+pi_results_min_df_HT3_red = data.frame(pi_results_min_HT3_red)
+#pi_results_min_df_HT3
+
+ggplot() + geom_line(aes(x=pi_results_min_df_HT3_red$time, y=pi_results_min_df_HT3_red$P, color='Optimized Parameters'))+
+           geom_point(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data"))+
+  ylab("Population") + xlab("Time")
+```
+Plot of the simulated and observed parasite counts for the control experiment and 0.01 mg l^-1 microplastics:
+
+```{r}
+ggplot() + geom_line(aes(x=pi_results_min_df_HT1_red$time, y=pi_results_min_df_HT1_red$P, color='0.01 - Optimized Parameters'))+
+           geom_point(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data"))+
+       geom_line(aes(x=pi_results_min_df_HT1$time, y=pi_results_min_df_HT1$P, color='Control - Optimized Parameters'))+
+       geom_point(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data")) +
+       geom_line(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data"))+
+  ylab("Log of Mean Parasite Intensity") + xlab("Time (Days)")+ggtitle("Holling Type I Functional Response Model")
+```
+
+
+```{r}
+ggplot() + geom_line(aes(x=pi_results_min_df_HT2_red$time, y=pi_results_min_df_HT2_red$P, color='0.01 - Optimized Parameters'))+
+           geom_point(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data"))+
+       geom_line(aes(x=pi_results_min_df_HT2$time, y=pi_results_min_df_HT2$P, color='Control - Optimized Parameters'))+
+       geom_point(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data")) +
+       geom_line(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data"))+
+  ylab("Log of Mean Parasite Intensity") + xlab("Time (Days)")+ggtitle("Holling Type II Functional Response Model")
+```
+
+
+```{r}
+ggplot() + geom_line(aes(x=pi_results_min_df_HT3_red$time, y=pi_results_min_df_HT3_red$P, color='0.01 - Optimized Parameters'))+
+           geom_point(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$red_data_day, y=observed_df$red_data_parasite, color="0.01 - Experimental Obsv. Parasite Data"))+
+       geom_line(aes(x=pi_results_min_df_HT3$time, y=pi_results_min_df_HT3$P, color='Control - Optimized Parameters'))+
+       geom_point(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data")) +
+       geom_line(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data"))+
+  ylab("Log of Mean Parasite Intensity") + xlab("Time (Days)")+ggtitle("Holling Type III Functional Response Model")
+```
+
+
+Now, we will calculate AIC to determine which of these three models is best suited. We will consider normal measurement error. 
+
+Calculating AIC for the control data models: 
+```{r}
+HT1_nll = function(beta, d, p, B, f, sigma){
+  
+  # Setting initial conditions and parameters just like before
+  times = observed_df$green_data_day
+  params = c(beta=beta, d=d, p=p, B=B, f=f)
+  init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+  
+  # Simulate the model
+  ode_res = as.data.frame(ode(func=pi_model_HT1, 
+                                y=init_vals, 
+                                times=times,
+                                parms=params))
+  nll = -1*sum(dnorm(observed_df$green_data_parasite, mean=ode_res$P[1:length(times)], sd=sigma, log=TRUE)) #observed_df$green_data_parasite
+
+  return(nll)
+  
+}
+
+# Test that the function is working
+start_params = as.vector(fit3_HT1$par)
+#start_params
+
+
+# Get the mle estimates for my parameters
+fit_all_HT1 = mle2(HT1_nll, 
+               start=list(beta = start_params[1], 
+                          d = start_params[2], 
+                          p = start_params[3],
+                          B = start_params[4],
+                          f = start_params[5],
+                          sigma = 0.01),
+               method="L-BFGS-B",
+               lower=c(0, 0, 0, 0, 0, 0),
+               upper=c(3, 3, 3, 3, 3, 3))
+
+
+AIC(fit_all_HT1)
+#AIC: -58.90567
+```
+
+```{r}
+
+HT2_nll = function(beta, d, B, a, c, b, sigma){
+  # Setting initial conditions and parameters just like before
+  times = observed_df$green_data_day
+  params = c(beta=beta, d=d, B=B, a=a, c=c, b=b)
+  init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+  
+  # Simulate the model
+  ode_res = as.data.frame(ode(func=pi_model_HT2, 
+                                y=init_vals, 
+                                times=times,
+                                parms=params))
+  nll = -1*sum(dnorm(observed_df$green_data_parasite, mean=ode_res$P[1:length(times)], sd=sigma, log=TRUE)) #observed_df$green_data_parasite
+
+  return(nll)
+  
+}
+
+# Test that the function is working
+start_params = as.vector(fit3_HT2$par)
+#start_params
+
+
+# Get the mle estimates for my parameters
+fit_all_HT2 = mle2(HT2_nll, 
+               start=list(beta = start_params[1], 
+                          d = start_params[2], 
+                          B = start_params[3],
+                          a = start_params[4],
+                          c = start_params[5],
+                          b = start_params[6],
+                          sigma = 0.01),
+               method="L-BFGS-B",
+               lower=c(beta=0, d=0, B=0, a=0, c=0, b=0, sigma=0),
+               upper=c(beta=3, d=2, B=3, a=3, c=3, b=3, sigma=3))
+AIC(fit_all_HT2)
+#AIC: -54.45174
+```
+
+
+```{r}
+
+HT3_nll = function(beta, d, B, a, c, b, sigma){
+  
+  # Setting initial conditions and parameters just like before
+  times = observed_df$green_data_day
+  params = c(beta=beta, d=d, B=B, a=a, c=c, b=b)
+  init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+  
+  # Simulate the model
+  ode_res = as.data.frame(ode(func=pi_model_HT3, 
+                                y=init_vals, 
+                                times=times,
+                                parms=params))
+  nll = -1*sum(dnorm(observed_df$green_data_parasite, mean=ode_res$P[1:length(times)], sd=sigma, log=TRUE)) #observed_df$green_data_parasite
+
+  return(nll)
+  
+}
+
+# Test that the function is working
+start_params = as.vector(fit3_HT3$par)
+#start_params
+
+HT3_nll(beta = start_params[1], 
+                          d = start_params[2], 
+                          B = start_params[3],
+                          a = start_params[4],
+                          c = start_params[5],
+                          b = start_params[6],
+                          sigma = 0.1)
+# Get the mle estimates for my parameters
+fit_all_HT3 = mle2(HT3_nll, 
+               start=list(beta = start_params[1], 
+                          d = 0.099, 
+                          B = start_params[3],
+                          a = start_params[4],
+                          c = start_params[5],
+                          b = start_params[6],
+                          sigma = 0.1),
+               method="L-BFGS-B",
+               lower=c(beta=0, d=0, B=0, a=0, c=0, b=0, sigma=0),
+               upper=c(beta=3, d=3, B=3, a=3, c=3, b=3, sigma=1))
+#fit_all_HT3
+AIC(fit_all_HT3)
+#AIC: -56.41178
+```
+
+
+
+
+Calculating AIC for the 0.01 mg l^-1 microplastics data models: 
+
+```{r}
+HT1_nll_0.01 = function(beta, d, p, B, f, sigma){
+  
+  # Setting initial conditions and parameters just like before
+  times = observed_df$red_data_day
+  params = c(beta=beta, d=d, p=p, B=B, f=f)
+  init_vals = c(P= observed_df$red_data_parasite[1], I = 0.1)
+  
+  # Simulate the model
+  ode_res = as.data.frame(ode(func=pi_model_HT1, 
+                                y=init_vals, 
+                                times=times,
+                                parms=params))
+  nll = -1*sum(dnorm(observed_df$red_data_parasite, mean=ode_res$P[1:length(times)], sd=sigma, log=TRUE)) 
+
+  return(nll)
+  
+}
+
+# Test that the function is working
+start_params = as.vector(fit0_HT1_red$par) #fit3_HT1_red$par
+#start_params
+
+
+# Get the mle estimates for my parameters
+fit_all_HT1_0.01 = mle2(HT1_nll_0.01, 
+               start=list(beta = start_params[1], 
+                          d = start_params[2], 
+                          p = start_params[3],
+                          B = start_params[4],
+                          f = start_params[5],
+                          sigma = 0.1),
+               method="L-BFGS-B",
+               lower=c(beta=0.01, d=0.01, p=0.01, B=0.01, f=0.01, sigma=0.01),
+               upper=c(beta=3, d=3, p=3, B=3, f=3, sigma=1))
+
+
+AIC(fit_all_HT1_0.01)
+#AIC: -31.29976 
+```
+
+```{r}
+
+HT2_nll_0.01 = function(beta, d, B, a, c, b, sigma){
+  # Setting initial conditions and parameters just like before
+  times = observed_df$red_data_day
+  params = c(beta=beta, d=d, B=B, a=a, c=c, b=b)
+  init_vals = c(P= observed_df$red_data_parasite[1], I = 0.1)
+  
+  # Simulate the model
+  ode_res = as.data.frame(ode(func=pi_model_HT2, 
+                                y=init_vals, 
+                                times=times,
+                                parms=params))
+  nll = -1*sum(dnorm(observed_df$red_data_parasite, mean=ode_res$P[1:length(times)], sd=sigma, log=TRUE)) #observed_df$green_data_parasite
+
+  return(nll)
+  
+}
+
+# Test that the function is working
+start_params = as.vector(fit3_HT2_red$par) 
+start_params
+
+
+# Get the mle estimates for my parameters
+fit_all_HT2_0.01 = mle2(HT2_nll_0.01, 
+               start=list(beta = start_params[1], 
+                          d = start_params[2], 
+                          B = start_params[3],
+                          a = start_params[4],
+                          c = start_params[5],
+                          b = start_params[6],
+                          sigma = 0.01),
+               method="L-BFGS-B",
+               lower=c(beta=0, d=0, B=0, a=0, c=0, b=0, sigma=0),
+               upper=c(beta=3, d=2, B=10, a=Inf, c=3, b=Inf, sigma=1))
+AIC(fit_all_HT2_0.01)
+#AIC: -29.03474
+```
+
+
+```{r}
+
+HT3_nll_0.01 = function(beta, d, B, a, c, b, sigma){
+  
+  # Setting initial conditions and parameters just like before
+  times = observed_df$red_data_day
+  params = c(beta=beta, d=d, B=B, a=a, c=c, b=b)
+  init_vals = c(P= observed_df$red_data_parasite[1], I = 0.1)
+  
+  # Simulate the model
+  ode_res = as.data.frame(ode(func=pi_model_HT3, 
+                                y=init_vals, 
+                                times=times,
+                                parms=params))
+  nll = -1*sum(dnorm(observed_df$red_data_parasite, mean=ode_res$P[1:length(times)], sd=sigma, log=TRUE)) #observed_df$green_data_parasite
+
+  return(nll)
+  
+}
+
+# Test that the function is working
+start_params = as.vector(fit0_HT3_red$par)
+start_params
+
+#HT3_nll(beta = start_params[1], 
+#                          d = start_params[2], 
+#                          B = start_params[3],
+#                          a = start_params[4],
+#                          c = start_params[5],
+ #                         b = start_params[6],
+ #                         sigma = 0.1)
+
+# Get the mle estimates for my parameters
+fit_all_HT3_0.01 = mle2(HT3_nll_0.01, 
+               start=list(beta = start_params[1], 
+                          d = 0.099, 
+                          B = start_params[3],
+                          a = start_params[4],
+                          c = start_params[5],
+                          b = start_params[6],
+                          sigma = 0.1),
+               method="L-BFGS-B",
+               lower=c(beta=0.01, d=0.01, B=0.01, a=0.01, c=0.01, b=0.01, sigma=0),
+               upper=c(beta=3, d=3, B=5, a=Inf, c=3, b=Inf, sigma=1))
+#fit_all_HT3
+AIC(fit_all_HT3_0.01)
+#AIC: -27.67159
+```
+
+
+
+
+
+To prevent unbounded growth of the parasite, seen in the simulations of the Hollings Type I and II models, we will impose a carrying capacity via logistic growth in the growth term of the parasites equation. 
+
+```{r}
+pi_model_HT1_car_cap = function(time, state_vars, params){
+  
+  # Extract state variables
+  P = state_vars['P'] #mass of parasites
+  I = state_vars['I'] #immune particles 
+  
+  # Extract the parameters
+  #beta = params["beta"]
+  d = params["d"] #death term of immune particles
+  p = params["p"] #rate at which the immune particles kill parasite (predation of parasite by immune particles)
+  B = params["B"] #constant background level of immune particles that are always present with or without disease/parasites present
+  K = params["K"] #carrying capacity of parasites in the tank 
+  r = params["r"]
+  f = params["f"]
+  #ODEs 
+  #I: for immune system acting as the "predator" 
+      #B is baseline level of immune particles
+  #P: he parasite measure in mass 
+  
+  #considering a Holling Type I functional response
+  dP = r*P*(1-P/K) - p*I*P
+  dI = B + f*P*I - d*I   
+
+  return(list(c(dP, dI)))
+}
+```
+
+
+```{r}
+pi_model_HT2_car_cap = function(time, state_vars, params){
+  
+  # Extract state variables
+  P = state_vars['P'] #mass of parasites
+  I = state_vars['I'] #immune particles 
+  
+  # Extract the parameters
+  #beta = params["beta"]
+  d = params["d"] #death term of immune particles
+  #p = params["p"] #rate at which the immune particles kill parasite (predation of parasite by immune particles)
+  B = params["B"] #constant background level of immune particles that are always present with or without disease/parasites present
+  c = params["c"] #max per capita consumption rate 
+  a = params["a"] #1/2 saturation rate
+  K = params["K"] #carrying capacity of parasites in the tank 
+  r = params["r"] #intrinsic growth rate of parasite 
+  b = params["b"] #proportionality constant that "converts" detected parasites into more immune particles 
+
+  #ODEs 
+  #I: for immune system acting as the "predator" 
+      #B is baseline level of immune particles
+  #P: he parasite measure in mass 
+  
+  #considering a Holling Type II function response 
+  dP = r*P*(1-P/K) - I*P*c/(a+P)
+  dI = B - d*I + P*I*b/(a+P)
+
+  return(list(c(dP, dI)))
+}
+```
+
+```{r}
+pi_model_HT3_car_cap = function(time, state_vars, params){
+  
+  # Extract state variables
+  P = state_vars['P'] #mass of parasites
+  I = state_vars['I'] #immune particles 
+  
+  # Extract the parameters
+  #beta = params["beta"]
+  d = params["d"] #death term of immune particles
+  #p = params["p"] #rate at which the immune particles kill parasite (predation of parasite by immune particles)
+  B = params["B"] #constant background level of immune particles that are always present with or without disease/parasites present
+  c = params["c"] #max per capita consumption rate 
+  a = params["a"] #1/2 saturation rate
+  K = params["K"] #carrying capacity of parasites in the tank 
+  r = params["r"] #intrinsic growth rate of parasite 
+  b = params["b"] #proportionality constant that "converts" detected parasites into more immune particles 
+
+  #ODEs 
+  #I: for immune system acting as the "predator" 
+      #B is baseline level of immune particles
+  #P: he parasite measure in mass 
+
+  #considering a Holling Type III function response 
+  dP = r*P*(1-P/K) - I*P^2*c/(a^2+P^2)
+  dI = B - d*I + I*P^2*b/(a^2+P^2)
+  
+
+
+  return(list(c(dP, dI)))
+}
+```
+
+
+```{r}
+rss_pi_HT1_car_cap = function(params, data_frame){
+  times = observed_df$green_data_day #times of measurements from observed digitized data
+  
+  # Initial conditions
+  init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+  
+  # Simulate the model.
+  pred = ode(init_vals, times, pi_model_HT1_car_cap, params)
+  pred_df = data.frame(pred)
+  
+  # Extract B from the model. Don't include the initial value because that is not in the data.
+  predP = pred_df$P
+  
+  # Extract observed data
+  obsP = observed_df$green_data_parasite
+  
+  # Compute residuals
+  errors = obsP - predP
+  
+  rss = sum(errors^2)
+  
+  return(rss)
+}
+```
+
+```{r}
+#function to compute the RSS for a given set of parameters 
+
+rss_pi_HT2_car_cap = function(params, data_frame){
+  times = observed_df$green_data_day #times of measurements from observed digitized data
+  
+  # Initial conditions
+  init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+  
+  # Simulate the model.
+  pred = ode(init_vals, times, pi_model_HT2_car_cap, params)
+  pred_df = data.frame(pred)
+  
+  # Extract B from the model. Don't include the initial value because that is not in the data.
+  predP = pred_df$P
+  
+  # Extract observed data
+  obsP = observed_df$green_data_parasite
+  
+  # Compute residuals
+  errors = obsP - predP
+  
+  rss = sum(errors^2)
+  
+  return(rss)
+}
+```
+
+```{r}
+#function to compute the RSS for a given set of parameters 
+
+rss_pi_HT3_car_cap = function(params, data_frame){
+  times = observed_df$green_data_day #times of measurements from observed digitized data
+  
+  # Initial conditions
+  init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+  
+  # Simulate the model.
+  pred = ode(init_vals, times, pi_model_HT3_car_cap, params)
+  pred_df = data.frame(pred)
+  
+  # Extract B from the model. Don't include the initial value because that is not in the data.
+  predP = pred_df$P
+  
+  # Extract observed data
+  obsP = observed_df$green_data_parasite
+  
+  # Compute residuals
+  errors = obsP - predP
+  
+  rss = sum(errors^2)
+  
+  return(rss)
+}
+```
+
+
+```{r}
+#using optim to find appropriate parameters
+params_HT1_car_cap = c(d = 0.2, p = 0.3 , B = 0.005, K=10, r=0.1, f=0.1)
+
+#FOR HOLLINGS TYPE I
+fit0_HT1_car_cap = optim(params_HT1_car_cap, rss_pi_HT1_car_cap, data=observed_df$green_data)
+fit0_HT1_car_cap$par
+#fit0$convergence
+fit1_HT1_car_cap = optim(fit0_HT1$par, rss_pi_HT1_car_cap, data=observed_df$green_data)
+fit1_HT1_car_cap$par
+fit3_HT1_car_cap = optim(fit1_HT1_car_cap$par, rss_pi_HT1_car_cap, data=observed_df$green_data)
+fit3_HT1_car_cap$par
+```
+```{r}
+times = observed_df$green_data_day #times of measurements from observed digitized data
+  # Initial conditions
+init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+
+pi_results_min_HT1_car_cap = ode(init_vals, times, pi_model_HT1_car_cap, fit0_HT1_car_cap$par)
+
+pi_results_min_df_HT1_car_cap = data.frame(pi_results_min_HT1_car_cap)
+#pi_results_min_df_HT1_car_cap
+
+ggplot() + geom_line(aes(x=pi_results_min_df_HT1_car_cap$time, y=pi_results_min_df_HT1_car_cap$P, color='Optimized Parameters'))+geom_point(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data")) +geom_line(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data"))+
+  ylab("Population") + xlab("Time")
+```
+
+
+```{r}
+params_HT2_car_cap = c(beta=0.11, d = -0.2, p = 0.3 , B = -0.005, a = 2.6, c = 0.7, K=1000, r = 0.01, b=0.1)
+
+
+#FOR HOLLINGS TYPE II
+fit0_HT2_car_cap = optim(params_HT2_car_cap, rss_pi_HT2_car_cap, data=observed_df$green_data)
+fit0_HT2_car_cap$par
+#fit0$convergence
+fit1_HT2_car_cap = optim(fit0_HT2_car_cap$par, rss_pi_HT2_car_cap, data=observed_df$green_data)
+fit1_HT2_car_cap$par
+fit3_HT2_car_cap = optim(fit1_HT2_car_cap$par, rss_pi_HT2_car_cap, data=observed_df$green_data)
+fit3_HT2_car_cap$par
+```
+
+```{r}
+times = observed_df$green_data_day #times of measurements from observed digitized data
+  # Initial conditions
+init_vals = c(P= observed_df$green_data_parasite[1], I = 0.05)
+
+pi_results_min_HT2_car_cap = ode(init_vals, times, pi_model_HT2_car_cap, fit3_HT2_car_cap$par)
+
+pi_results_min_df_HT2_car_cap = data.frame(pi_results_min_HT2_car_cap)
+#pi_results_min_df_HT2
+
+ggplot() + geom_line(aes(x=pi_results_min_df_HT2_car_cap$time, y=pi_results_min_df_HT2_car_cap$P, color='Optimized Parameters'))+
+      geom_point(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data"))+
+  ylab("Population") + xlab("Time")
+```
+
+```{r}
+params_HT3_car_cap = c(beta=3, d = -0.2, p = 0.3 , B = -0.005, a = 2.6, c = 0.7, K=1000, r = 0.01, b=0.1)
+
+#FOR HOLLINGS TYPE III
+fit0_HT3_car_cap = optim(params_HT3_car_cap, rss_pi_HT3_car_cap, data=observed_df$green_data)
+fit0_HT3_car_cap$par
+#fit0$convergence
+fit1_HT3_car_cap  = optim(fit0_HT3_car_cap$par, rss_pi_HT3_car_cap, data=observed_df$green_data)
+fit1_HT3_car_cap$par
+fit3_HT3_car_cap = optim(fit1_HT3_car_cap$par, rss_pi_HT3_car_cap, data=observed_df$green_data)
+fit3_HT3_car_cap$par
+```
+
+```{r}
+times = observed_df$green_data_day #times of measurements from observed digitized data
+  # Initial conditions
+init_vals = c(P= observed_df$green_data_parasite[1], I = 0.1)
+
+pi_results_min_HT3 = ode(init_vals, times, pi_model_HT3_car_cap, fit0_HT3_car_cap$par)
+
+pi_results_min_df_HT3 = data.frame(pi_results_min_HT3)
+pi_results_min_df_HT3
+
+ggplot() + geom_line(aes(x=pi_results_min_df_HT3$time, y=pi_results_min_df_HT3$P, color='Optimized Parameters'))+
+      geom_point(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data")) +
+            geom_line(aes(x=observed_df$green_data_day, y=observed_df$green_data_parasite, color="Control - Experimental Obsv. Parasite Data"))+
+  ylab("Population") + xlab("Time")
+```
+
+
+
+
+
+
+
+

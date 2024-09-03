@@ -1,0 +1,25 @@
+name: r_bayesian_stats
+channels:
+ - conda-forge
+dependencies:
+  - r-base
+  - r-data.table 
+  - r-cmdstanr 
+  - r-ggplot2 
+  - r-mvtnorm
+  - r-devtools
+  - r-loo
+  - r-dagitty
+  - r-shape
+  - r-coda
+  # - r-magrittr 
+  # - r-rstan
+  # - r-tidyverse
+  # - r-mvtnorm
+  # - r-devtools
+  # - r-rstanarm
+  # - r-tidybayes
+  # - r-broom.mixed
+  # - r-patchwork
+  # - r-brms
+  # - r-arm

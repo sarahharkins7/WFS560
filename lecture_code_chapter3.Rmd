@@ -1,0 +1,220 @@
+---
+title: 'Lecture 3 code'
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+```{r}
+## Compute posterior for northern harriers
+p_grid = seq(0, 1, len=100)
+prior = dunif(p_grid, 0, 1)
+likelihood = dbinom(6, size=8, prob=p_grid)
+unnorm_posterior_nh = likelihood * prior
+posterior_nh = unnorm_posterior_nh / sum(unnorm_posterior_nh)
+
+# Red-tailed hawk
+prior = dunif(p_grid, 0, 1)
+likelihood = dbinom(0, size=8, prob=p_grid)
+unnorm_posterior_red = likelihood * prior
+posterior_red = unnorm_posterior_red / sum(unnorm_posterior_red)
+
+ggplot() + geom_line(aes(x=p_grid, y=posterior_nh, color="Northern harrier")) +
+		   geom_line(aes(x=p_grid, y=posterior_red, color="Red-tailed hawk")) +
+		   scale_color_manual(values=c("blue", "red")) +
+		   xlab("Prob. successsful attack") + ylab("Posterior probability") +
+		   theme_classic()
+# ggsave("bird_posteriors.pdf", width=5, height=3)
+```
+
+```{r}
+# Plot specific bird posteriors
+ggplot() + geom_line(aes(x=p_grid, y=posterior_nh)) +
+		   xlab("Prob. successsful attack") + ylab("Posterior probability") +
+		   theme_classic()
+ggsave("harrier_posterior.pdf", width=5, height=3)
+
+ggplot() + geom_line(aes(x=p_grid, y=posterior_red)) +
+		   xlab("Prob. successsful attack") + ylab("Posterior probability") +
+		   theme_classic()
+# ggsave("redtailed_posterior.pdf", width=5, height=3)
+```
+
+```{r}
+# Samples from posterior
+samples_nh = sample(p_grid,  
+                    prob=posterior_nh, # samples are wrt the posterior
+                    size=10000, # number of samples
+                    replace=TRUE) #able to draw the same value more than once  
+
+ggplot() + geom_histogram(aes(x=samples_nh)) +
+		   theme_classic() + xlab("Prob. successful attack") +
+		   ylab("Count in bucket") + xlim(c(0, 1.05))
+ggsave("pvals_hist.pdf", width=5, height=3)
+
+dp = p_grid[2] - p_grid[1]
+ggplot() + geom_histogram(aes(x=samples_nh, after_stat(density))) +
+		   theme_classic() + xlab("Prob. successful attack") +
+		   ylab("Density") +
+		   geom_line(aes(x=p_grid, y=posterior_nh / dp)) +
+		   xlim(c(0, 1.05))
+# ggsave("pvals_hist_density.pdf", width=5, height=3)
+
+mean(samples_nh)
+median(samples_nh)
+which.max(table(samples_nh)) # the mode 
+
+# samples_nh < 0.5 produces an array of booleans (True and False)
+mean(samples_nh < 0.5) 
+# alternate approach
+sum(samples_nh<0.5)/length(samples_nh)
+
+
+
+# probability that smaple is between 0.27 and 0.75
+
+sum(samples_nh>0.25 & samples_nh<0.75)/length(samples_nh)
+```
+
+
+```{r}
+# Calculate probability that p_red-tail hawk is less than 0.5 
+
+samples_red = sample(p_grid,  
+                    prob=posterior_red, # samples are wrt the posterior
+                    size=10000, # number of samples
+                    replace=TRUE) #able to draw the same value more than once
+
+hist(samples_red)
+mean(samples_red<0.5)
+sum(samples_nh<0.5)/length(samples_nh)
+
+```
+
+
+
+```{r}
+## Plot some visual percentile intervals
+
+bounds = quantile(samples_nh, c(0.025, 0.975))
+
+ind = p_grid > bounds[1] & p_grid < bounds[2]
+ggplot() + geom_line(aes(x=p_grid, y=posterior_nh)) +
+		   geom_area(aes(x=p_grid[ind], y=posterior_nh[ind]), fill='blue', alpha=0.2) +
+		   xlab("Prob. successful attack") +
+		   ylab("Density") +
+		   annotate("text", x=0.25, y=0.002, label="2.5%") +
+		   annotate("text", x=0.75, y=0.002, label="95%") +
+		   annotate("text", x=1.02, y=0.002, label="2.5%") +
+		   annotate("text", x=bounds[1], y=-0.00, label=round(bounds[1], 2)) +
+		   annotate("text", x=bounds[2], y=-0.00, label=round(bounds[2], 2)) +
+		   theme_classic()
+
+
+# ggsave("credible_interval_example.pdf", width=5, height=3)
+```
+
+
+```{r}
+# testing hypothesis that parameter is 0.25
+samples_red = sample(p_grid, prob=posterior_red, 
+					 size=10000, replace=TRUE)
+quantile(samples_red, c(0.025, 0.975)) 
+
+# Output; 
+#     2.5%     97.5% 
+#0.0000000 0.3333333 
+
+# Conclusion: 
+# Given out model, we are 95% confident that p_red-tail hawk lies somewhere between [0, 0.333]. There fore, there is not strong evidence to conclude that your colleague's hypothesis is wrong because 0.25 \in [0, 0.333].
+```
+
+
+```{r}
+PI(samples_nh, prob=0.95)
+PI(samples_red, prob=0.95)
+```
+
+
+```{r}
+# Compute the difference
+library(ggplot2)
+samples_nh = sample(p_grid, prob=posterior_nh, 
+					 size=10000, replace=TRUE)
+samples_red = sample(p_grid, prob=posterior_red, 
+					 size=10000, replace=TRUE)
+
+# Get the difference between posterior samples
+diff_posterior = samples_nh - samples_red
+
+ggplot() + geom_histogram(aes(x=diff_posterior)) +
+		   theme_classic() +
+		   xlab("Northern harrier - Red-tailed prob. success") +
+		   ylab("Count")
+#ggsave("difference_pvals.pdf", width=5, height=3)
+```
+```{r}
+library(rethinking)
+PI(diff_posterior, prob=0.95)
+```
+
+```{r}
+quantile(diff_posterior, c(0.025, 0.975))
+```
+
+
+```{r}
+# Posterior predictive simulation
+
+# Approach 1
+
+# Step 1: Get a point estimate
+mean_p = mean(samples_nh)
+
+# Step 2: Simulate many realizations of the data
+posterior_prediction = rbinom(10000, size=8, prob=mean_p)
+
+ggplot() + geom_histogram(aes(x=posterior_prediction, fill="Approach 1")) +
+		   geom_vline(aes(xintercept=6), linetype="dashed") +
+		   scale_fill_manual(values=c("gray")) +
+		   xlab("Predicted number of successes") +
+		   ylab("Count in 'predictive' posterior") +
+		   theme_classic()
+ggsave("posterior_predictive1.pdf", width=5, height=3)
+```
+
+```{r}
+# Approach 2
+
+# Step 1: Get a point estimate
+
+# Step 1-3: All in one line
+posterior_prediction_full = rbinom(length(samples_nh), size=8, prob=samples_nh)
+
+ggplot() + geom_histogram(aes(x=posterior_prediction, fill="Approach 1")) +
+		   geom_histogram(aes(x=posterior_prediction_full, fill="Approach 2"), alpha=0.2, position="dodge") +
+		   geom_vline(aes(xintercept=6), linetype="dashed") +
+		   scale_fill_manual(values=c("gray", "blue")) +
+		   xlab("Predicted number of successes") +
+		   ylab("Count in predictive posterior") +
+		   theme_classic()
+ggsave("posterior_predictive2.pdf", width=5, height=3)
+
+quantile(posterior_prediction_full, c(0.025, 0.975))
+```
+
+
+```{r}
+## Challenge problem
+
+ppd_nh = rbinom(length(samples_nh), size=8, prob=samples_nh)
+ppd_red = rbinom(length(samples_red), size=8, prob=samples_red)
+ppd_diff = ppd_nh - ppd_red
+
+ggplot() + geom_histogram(aes(x=ppd_diff)) + 
+		   geom_vline(aes(xintercept=6), linetype="dashed") + 
+		   theme_classic() + xlab("Difference") +
+		   ylab("Count")
+```
+
