@@ -180,108 +180,95 @@ for (i in seq_along(extracted_data)) {
 Plotting the posteriors
 ```{r}
 # Year 1, Field supplemented
-p1 = ggplot() + 
+ggplot() + 
       geom_line(aes(x=p_grid, y=posteriors[[1]], linetype="Posterior")) + 
 		  geom_line(aes(x=p_grid, y=prior*dp, linetype="Prior")) +
 		  ylab("Probability") + xlab("Prob. field used") +
       ggtitle("Year 1, Field supplemented")+
-		  theme_classic()
+      geom_vline(aes(xintercept=mean_p[[1]], color="mean")) + 
+	    geom_vline(aes(xintercept=mode_p[[1]], color="mode"))+		  
+      theme_classic()
 
-# ggsave("inference1.pdf", width=4, height=3)
-
-p1 + geom_vline(aes(xintercept=mean_p[[1]], color="mean")) + 
-	 geom_vline(aes(xintercept=mode_p[[1]], color="mode"))
-```
-
-```{r}
 # Year 1, Field not supplemented
-p1 = ggplot() + 
+ggplot() + 
       geom_line(aes(x=p_grid, y=posteriors[[2]], linetype="Posterior")) + 
 		  geom_line(aes(x=p_grid, y=prior*dp, linetype="Prior")) +
 		  ylab("Probability") + xlab("Prob. field used") +
       ggtitle("Year 1, Field not supplemented")+
-		  theme_classic()
-
-# ggsave("inference1.pdf", width=4, height=3)
-
-p1 + geom_vline(aes(xintercept=mean_p[[2]], color="mean")) + 
-	 geom_vline(aes(xintercept=mode_p[[2]], color="mode"))
+		  geom_vline(aes(xintercept=mean_p[[2]], color="mean")) + 
+	    geom_vline(aes(xintercept=mode_p[[2]], color="mode"))+ 
+      theme_classic()
 ```
+
+
 
 ```{r}
 # Year 2, Field supplemented
-p1 = ggplot() + 
+ggplot() + 
       geom_line(aes(x=p_grid, y=posteriors[[3]], linetype="Posterior")) + 
 		  geom_line(aes(x=p_grid, y=prior*dp, linetype="Prior")) +
 		  ylab("Probability") + xlab("Prob. field used") +
       ggtitle("Year 2, Field supplemented")+
-		  theme_classic()
+      geom_vline(aes(xintercept=mean_p[[3]], color="mean")) + 
+	    geom_vline(aes(xintercept=mode_p[[3]], color="mode"))+
+      theme_classic()
 
-# ggsave("inference1.pdf", width=4, height=3)
-
-p1 + geom_vline(aes(xintercept=mean_p[[3]], color="mean")) + 
-	 geom_vline(aes(xintercept=mode_p[[3]], color="mode"))
-```
-
-```{r}
 # Year 2, Field not supplemented
-p1 = ggplot() + 
+ggplot() + 
       geom_line(aes(x=p_grid, y=posteriors[[4]], linetype="Posterior")) + 
 		  geom_line(aes(x=p_grid, y=prior*dp, linetype="Prior")) +
 		  ylab("Probability") + xlab("Prob. field used") +
       ggtitle("Year 2, Field not supplemented")+
+      geom_vline(aes(xintercept=mean_p[[4]], color="mean")) + 
+	    geom_vline(aes(xintercept=mode_p[[4]], color="mode"))+
 		  theme_classic()
-
-# ggsave("inference1.pdf", width=4, height=3)
-
-p1 + geom_vline(aes(xintercept=mean_p[[4]], color="mean")) + 
-	 geom_vline(aes(xintercept=mode_p[[4]], color="mode"))
 ```
+
 
 5. How are you comparing posterior distributions to answer the question of interest?
 
 A5: Considering changes in the MAP from year 1 to year 2 with the supplemented and unsupplemented fields via plotting and a summary table. 
 
 ```{r}
-# Field supplemented
+# Prob. of field usage given the field is supplemented
 
-p1 = ggplot() + 
+ggplot() + 
       geom_line(aes(x=p_grid, y=posteriors[[1]], linetype="Posterior Yr. 1"), color = "black") + 
 		  geom_line(aes(x=p_grid, y=prior*dp, linetype="Prior Year 1")) +
-      geom_vline(aes(xintercept=mean_p[[1]], color="mean (y1)")) + 
+      #geom_vline(aes(xintercept=mean_p[[1]], color="mean (y1)")) + 
 	    geom_vline(aes(xintercept=mode_p[[1]], color="mode  (y1)"))+
       geom_line(aes(x=p_grid, y=posteriors[[3]], linetype="Posterior Yr. 2"), color = "gray") + 
 		  geom_line(aes(x=p_grid, y=prior*dp, linetype="Prior Year 2")) +
-		  ylab("Probability") + xlab("Prob. field used") +
+		  ylab("Probability") + xlab("Prob. field used given the field is supplemented") +
       ggtitle("Field Supplemented for Years 1 and 2")+
-      geom_vline(aes(xintercept=mean_p[[3]], color="mean  (y2)")) + 
+      #geom_vline(aes(xintercept=mean_p[[3]], color="mean  (y2)")) + 
 	    geom_vline(aes(xintercept=mode_p[[3]], color="mode  (y2)"))+
       theme_classic()
 
-p1
 
-```
 
-```{r}
 # Field not supplemented
 
-p1 = ggplot() + 
+ggplot() + 
       geom_line(aes(x=p_grid, y=posteriors[[2]], linetype="Posterior Yr. 1"), color = "black") + 
 		  geom_line(aes(x=p_grid, y=prior*dp, linetype="Prior Year 1")) +
-      geom_vline(aes(xintercept=mean_p[[2]], color="mean (y1)")) + 
+      #geom_vline(aes(xintercept=mean_p[[2]], color="mean (y1)")) + 
 	    geom_vline(aes(xintercept=mode_p[[2]], color="mode  (y1)"))+
       geom_line(aes(x=p_grid, y=posteriors[[4]], linetype="Posterior Yr. 2"), color = "gray") + 
 		  geom_line(aes(x=p_grid, y=prior*dp, linetype="Prior Year 2")) +
-		  ylab("Probability") + xlab("Prob. field used") +
+		  ylab("Probability") + xlab("Prob. field used given field is not supplemented") +
       ggtitle("Field Not Supplemented for Years 1 and 2")+
-      geom_vline(aes(xintercept=mean_p[[4]], color="mean  (y2)")) + 
+      #geom_vline(aes(xintercept=mean_p[[4]], color="mean  (y2)")) + 
 	    geom_vline(aes(xintercept=mode_p[[4]], color="mode  (y2)"))+
       theme_classic()
 
-p1
-```
-# Reconsidering the model using a Beta distribution as the prior: 
 
+
+```
+
+
+# Reconsidering the model using a Beta distribution as the prior: 
+The parameters for this prior are based on an example in the slides. (These parameters can definitely be improved upon.)
 $$
 \begin{aligned}
 U_k &\sim \text{Binomial}(N, p_k^s) \\
@@ -336,62 +323,171 @@ for (i in seq_along(extracted_data)) {
 
 ```{r}
 # Field supplemented; beta prior 
-
-p1 = ggplot() + 
+ggplot() + 
       geom_line(aes(x=p_grid, y=posteriors_beta[[1]], linetype="Posterior Yr. 1"), color = "black") + 
 		  geom_line(aes(x=p_grid, y=prior_beta*dp, linetype="Prior Year 1")) +
-      geom_vline(aes(xintercept=mean_p_beta[[1]], color="mean (y1)")) + 
+      #geom_vline(aes(xintercept=mean_p_beta[[1]], color="mean (y1)")) + 
 	    geom_vline(aes(xintercept=mode_p_beta[[1]], color="mode  (y1)"))+
       geom_line(aes(x=p_grid, y=posteriors_beta[[3]], linetype="Posterior Yr. 2"), color = "gray") + 
 		  geom_line(aes(x=p_grid, y=prior_beta*dp, linetype="Prior Year 2")) +
-		  ylab("Probability") + xlab("Prob. field used") +
+		  ylab("Probability") + xlab("Prob. field used given field is supplemented") +
       ggtitle("Field Supplemented for Years 1 and 2")+
-      geom_vline(aes(xintercept=mean_p_beta[[3]], color="mean  (y2)")) + 
+      #geom_vline(aes(xintercept=mean_p_beta[[3]], color="mean  (y2)")) + 
 	    geom_vline(aes(xintercept=mode_p_beta[[3]], color="mode  (y2)"))+
       theme_classic()
 
-p1
-
-```
-
-
-```{r}
 # Field not supplemented; Beta prior 
-
-p1 = ggplot() + 
+ggplot() + 
       geom_line(aes(x=p_grid, y=posteriors_beta[[2]], linetype="Posterior Yr. 1"), color = "black") + 
 		  geom_line(aes(x=p_grid, y=prior_beta*dp, linetype="Prior Year 1")) +
-      geom_vline(aes(xintercept=mean_p_beta[[2]], color="mean (y1)")) + 
+      #geom_vline(aes(xintercept=mean_p_beta[[2]], color="mean (y1)")) + 
 	    geom_vline(aes(xintercept=mode_p_beta[[2]], color="mode  (y1)"))+
       geom_line(aes(x=p_grid, y=posteriors[[4]], linetype="Posterior Yr. 2"), color = "gray") + 
 		  geom_line(aes(x=p_grid, y=prior_beta*dp, linetype="Prior Year 2")) +
-		  ylab("Probability") + xlab("Prob. field used") +
+		  ylab("Probability") + xlab("Prob. field used given field is not supplemented") +
       ggtitle("Field Not Supplemented for Years 1 and 2")+
-      geom_vline(aes(xintercept=mean_p_beta[[4]], color="mean  (y2)")) + 
+      #geom_vline(aes(xintercept=mean_p_beta[[4]], color="mean  (y2)")) + 
 	    geom_vline(aes(xintercept=mode_p_beta[[4]], color="mode  (y2)"))+
       theme_classic()
-
-p1
 ```
+
+
+
 ```{r}
 print(mode_p)
 print(mode_p_beta)
-
-print(mode_p[[3]] - mode_p[[1]])
-print(mode_p_beta[[3]] - mode_p_beta[[1]])
-
-print(mode_p[[4]] - mode_p[[2]])
-print(mode_p_beta[[4]] - mode_p_beta[[2]])
 ```
+Here is the MAP (approximation of the desired parameters) for each of the following posterior distributions:
+
+|  Experiment  |Unif. Prior| Beta Prior| 
+|--------------|-----------|-----------|
+|Supp. Field Y1| 0.2020202 | 0.2222222 | 
+|No Supp. Y1   | 0.1313131 | 0.1515152 | 
+|Supp. Field Y2| 0.9292929 | 0.9090909 | 
+|No Supp. Y2   | 0.4646465 | 0.4646465 |
+
 
 # Conclusion: 
 
-We can see from the plots (with both the uniform and beta priors) that the probability of the cranes using the fields increases whether or not the field is supplemented. If the fields used for this experiment were relatively close to each other, the cranes could have seen the entire area as having a better food supply once they discovered the supplementary food in the first year and revisited the area as a whole in search of food. 
+For the conclusions, we will be considering the results from the beta prior distribution, since it is a more informative prior than the uniform distribution.
 
-With both priors, the MAP increases dramatically between years 1 and 2 in the supplemented fields:
+Consider the difference between samples of the posteriors as follows:
+- Year 2 supplemented minus Year 2 not supplemented
+- Year 1 supplemented minus Year 1 not supplemented
 
-|Experiment |Unif. Prior| Beta Prior| 
-|-----------|-----------|-----------|
-|Supp. Field| 0.7272727 | 0.6868687 | 
-|No Supp.   | 0.3333333 | 0.3131313 | 
+```{r}
+ 
+samples_supp_y1 = sample(p_grid,  
+                    prob=posteriors_beta[[1]], # samples are wrt the posterior
+                    size=10000, # number of samples
+                    replace=TRUE) #able to draw the same value more than once
+samples_no_supp_y1 = sample(p_grid,  
+                    prob=posteriors_beta[[2]], 
+                    size=10000, 
+                    replace=TRUE)
+samples_supp_y2 = sample(p_grid,  
+                    prob=posteriors_beta[[3]], 
+                    size=10000,
+                    replace=TRUE)
+samples_no_supp_y2 = sample(p_grid,  
+                    prob=posteriors_beta[[4]], 
+                    size=10000, 
+                    replace=TRUE) 
+
+posterior_diff_y2 =  (rbinom(length(samples_supp_y2), size=15, prob=samples_supp_y2) - rbinom(length(samples_no_supp_y2), size=15, prob=samples_no_supp_y2) )/15
+
+
+posterior_diff_y1 =  (rbinom(length(samples_supp_y1), size=15, prob=samples_supp_y1) - rbinom(length(samples_no_supp_y1), size=15, prob=samples_no_supp_y1) )/15
+
+ggplot() + geom_histogram(aes(x=posterior_diff_y1, fill="Difference Y1"), alpha=0.2, position="dodge") +
+          geom_histogram(aes(x=posterior_diff_y2, fill="Difference Y2"), alpha=0.2, position="dodge") +
+		      scale_fill_manual(values=c("gray", "blue")) +
+		      xlab("Difference in Field Usage in Years 1 and 2") +
+		      ylab("Count in predictive posterior") +
+          #ggtitle("")+
+		      theme_classic()
+
+
+```
+From the above plot, we see that mode of the difference (supp. - no supp.) in year 2 is positive indicating that the difference of field usage by cranes is increased by food supplementation. In the year 1 plot, the mode of the difference of field usage is roughly 0, indicating there there is little to no difference in field usage when the fields are not supplemented. 
+
+```{r}
+bounds_y1 = quantile(posterior_diff_y1, c(0.025, 0.975))
+print(bounds_y1)
+bounds_y2 = quantile(posterior_diff_y2, c(0.025, 0.975))
+print(bounds_y2)
+```
+
+```{r}
+bounds_y1_supp = quantile(samples_supp_y1, c(0.025, 0.975))
+
+p_grid = seq(0, 1, len=100)
+
+ind = p_grid > bounds_y1_supp[1] & p_grid < bounds_y1_supp[2]
+ggplot() + geom_line(aes(x=p_grid, y=posteriors_beta[[1]])) +
+       geom_area(aes(x=p_grid[ind], y=posteriors_beta[[1]][ind]), fill='blue', alpha=0.2) +
+		   xlab("Prob. of field usage in year 1 given field supplementation") +
+		   ylab("Density") +
+		   annotate("text", x=0.25, y=0.002, label="2.5%") +
+		   annotate("text", x=0.75, y=0.002, label="95%") +
+		   annotate("text", x=1.02, y=0.002, label="2.5%") +
+		   annotate("text", x=bounds_y1_supp[1], y=-0.00, label=round(bounds_y1_supp[1], 2)) +
+		   annotate("text", x=bounds_y1_supp[2], y=-0.00, label=round(bounds_y1_supp[2], 2)) +
+		   theme_classic()
+```
+```{r}
+bounds_y1_no_supp = quantile(samples_no_supp_y1, c(0.025, 0.975))
+
+p_grid = seq(0, 1, len=100)
+
+ind = p_grid > bounds_y1_no_supp[1] & p_grid < bounds_y1_no_supp[2]
+ggplot() + geom_line(aes(x=p_grid, y=posteriors_beta[[2]])) +
+       geom_area(aes(x=p_grid[ind], y=posteriors_beta[[2]][ind]), fill='blue', alpha=0.2) +
+		   xlab("Prob. of field usage in year 1 given no field supplementation") +
+		   ylab("Density") +
+		   annotate("text", x=0.25, y=0.002, label="2.5%") +
+		   annotate("text", x=0.75, y=0.002, label="95%") +
+		   annotate("text", x=1.02, y=0.002, label="2.5%") +
+		   annotate("text", x=bounds_y1_no_supp[1], y=-0.00, label=round(bounds_y1_no_supp[1], 2)) +
+		   annotate("text", x=bounds_y1_no_supp[2], y=-0.00, label=round(bounds_y1_no_supp[2], 2)) +
+		   theme_classic()
+
+```
+
+```{r}
+bounds_y2_supp = quantile(samples_supp_y2, c(0.025, 0.975))
+
+p_grid = seq(0, 1, len=100)
+
+ind = p_grid > bounds_y2_supp[1] & p_grid < bounds_y2_supp[2]
+ggplot() + geom_line(aes(x=p_grid, y=posteriors_beta[[3]])) +
+       geom_area(aes(x=p_grid[ind], y=posteriors_beta[[3]][ind]), fill='blue', alpha=0.2) +
+		   xlab("Prob. of field usage in year 2 given field supplementation") +
+		   ylab("Density") +
+		   annotate("text", x=0.25, y=0.002, label="2.5%") +
+		   annotate("text", x=0.75, y=0.002, label="95%") +
+		   annotate("text", x=1.02, y=0.002, label="2.5%") +
+		   annotate("text", x=bounds_y2_supp[1], y=-0.00, label=round(bounds_y2_supp[1], 2)) +
+		   annotate("text", x=bounds_y2_supp[2], y=-0.00, label=round(bounds_y2_supp[2], 2)) +
+		   theme_classic()
+```
+
+
+```{r}
+bounds_y2_no_supp = quantile(samples_no_supp_y2, c(0.025, 0.975))
+
+p_grid = seq(0, 1, len=100)
+
+ind = p_grid > bounds_y2_no_supp[1] & p_grid < bounds_y2_no_supp[2]
+ggplot() + geom_line(aes(x=p_grid, y=posteriors_beta[[4]])) +
+       geom_area(aes(x=p_grid[ind], y=posteriors_beta[[4]][ind]), fill='blue', alpha=0.2) +
+		   xlab("Prob. of field usage in year 2 given no field supplementation") +
+		   ylab("Density") +
+		   annotate("text", x=0.25, y=0.002, label="2.5%") +
+		   annotate("text", x=0.75, y=0.002, label="95%") +
+		   annotate("text", x=1.02, y=0.002, label="2.5%") +
+		   annotate("text", x=bounds_y2_no_supp[1], y=-0.00, label=round(bounds_y2_no_supp[1], 2)) +
+		   annotate("text", x=bounds_y2_no_supp[2], y=-0.00, label=round(bounds_y2_no_supp[2], 2)) +
+		   theme_classic()
+```
 

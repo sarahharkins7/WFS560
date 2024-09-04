@@ -16,7 +16,7 @@ ggplot(deer_data) + geom_point(aes(x=average_doe_weight, y=average_buck_antler_s
 					theme_classic() + xlab("Average doe body weight (lb)") +
 					ylab('Average buck antler score (inches)')
 
-ggsave("deer_data.pdf", width=4, height=3)
+#ggsave("deer_data.pdf", width=4, height=3)
 ```
 
 ```{r}
@@ -25,7 +25,7 @@ sim_deer = rnorm(50, mean=130, sd=10)
 
 ggplot() + geom_histogram(aes(x=sim_deer)) + xlab("Buck antler score (in)") +
 		   theme_classic()
-ggsave("antler_score.pdf", width=4, height=3)
+#ggsave("antler_score.pdf", width=4, height=3)
 
 ```
 
@@ -39,7 +39,7 @@ for(ss in sample_size){
 
 	ggplot() + geom_histogram(aes(x=sim_deer)) + xlab("Buck antler score (in)") +
 			   theme_classic() + ggtitle(paste0("Number of deer = ", ss))
-	ggsave(paste0("antler_score_", ss, ".pdf"), width=4, height=3)
+	#ggsave(paste0("antler_score_", ss, ".pdf"), width=4, height=3)
 }
 ```
 

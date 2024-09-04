@@ -181,7 +181,7 @@ ggplot() + geom_histogram(aes(x=posterior_prediction, fill="Approach 1")) +
 		   xlab("Predicted number of successes") +
 		   ylab("Count in 'predictive' posterior") +
 		   theme_classic()
-ggsave("posterior_predictive1.pdf", width=5, height=3)
+#ggsave("posterior_predictive1.pdf", width=5, height=3)
 ```
 
 ```{r}
@@ -199,10 +199,24 @@ ggplot() + geom_histogram(aes(x=posterior_prediction, fill="Approach 1")) +
 		   xlab("Predicted number of successes") +
 		   ylab("Count in predictive posterior") +
 		   theme_classic()
-ggsave("posterior_predictive2.pdf", width=5, height=3)
+#ggsave("posterior_predictive2.pdf", width=5, height=3)
 
 quantile(posterior_prediction_full, c(0.025, 0.975))
 ```
+
+```{r}
+posterior_practice =  rbinom(length(samples_nh), size=8, prob=samples_nh)  - rbinom(length(samples_red), size=8, prob=samples_red)
+
+ggplot() + geom_histogram(aes(x=posterior_practice, fill="Difference")) +
+		   #geom_histogram(aes(x=posterior_prediction_full, fill="Approach 2"), alpha=0.2, position="dodge") +
+		   #geom_vline(aes(xintercept=6), linetype="dashed") +
+		   #scale_fill_manual(values=c("gray", "blue")) +
+		   #xlab("Predicted number of successes") +
+		   #ylab("Count in predictive posterior") +
+		   theme_classic()
+```
+
+
 
 
 ```{r}
