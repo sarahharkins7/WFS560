@@ -43,6 +43,18 @@ for(ss in sample_size){
 }
 ```
 
+
+```{r}
+prior1 = rnorm(1000, 130, 40)
+hist(prior1)
+prior2 = runif(1000, 0, 300)
+hist(prior2)
+prior3 = rexp(1000, 1/10)
+hist(prior3)
+prior4 = runif(1000, 0, 50)
+hist(prior4)
+```
+
 ```{r}
 
 set.seed(15)
@@ -99,7 +111,9 @@ deer_mod = quap(
 precis(deer_mod)
 
 # Here is how we extract posterior samples!
-post = extract.samples(deer_mod, n=1e4)
+post = extract.samples(deer_mod, n=1e4) # work for a posterior that isn't necessarily a multi-modal normal 
+#dim(post) # 10,000 samples, 2 parameters (mu and sigma)
+post
 
 pdf("posterior_deer.pdf", height=3, width=6)
 dens(post)
@@ -108,6 +122,40 @@ dev.off()
 # Joint posterior
 plot(post$beta0, post$sigma, cex=0.5, pch=16, col=col.alpha(rangi2, 0.1))
 ```
+```{r}
+mean_beta0_sigma = colMeans(post)
+mean_beta0_sigma
+
+median_beta0 = median(post$beta0)
+median_beta0
+
+median_sigma = median(post$sigma)
+median_sigma
+
+# To pass in the dataframe of samples to perform operation in one step
+
+pi_vals = apply (post, # matrix you're passing in
+                 2,  # the axis you want to operator about (1 -> row-wise, 2 -> column-wise)
+                 function(x) quantile (x, c(0.025, 0.975))) # Funciton you are applying 
+pi_vals
+
+#quantile(post$beta0, c(0.025, 0.975))
+#PI(post$beta0)
+#PI(post$sigma)
+
+HPDI(post$beta0, 0.95)
+HPDI(post$sigma, 0.95)
+
+precis(post, prob = 0.95)
+
+# probability that average antler size in the population is greater than 130 in. 
+mean(post$beta0>130)
+
+
+```
+
+
+
 
 ```{r}
 # Analyze the posteriors
@@ -119,13 +167,17 @@ prec_res = precis(post, prob=0.95)
 prob_greater = mean(post$beta0 > 130)
 
 # Accounting for uncertainty
-pp_greater = pnorm(160, mean=post$beta0, sd=post$sigma, lower.tail=FALSE)
+pp_greater = pnorm(160, 
+                   mean=post$beta0, 
+                   sd=post$sigma, 
+                   lower.tail=FALSE) #lower.tail = FALSE returns 1-CDF
+
 mean(pp_greater)
 
 ggplot() + geom_density(aes(pp_greater)) + theme_classic() +
 		   xlab("Probability antler score > 160 inches")
 
-ggsave("posterior_pred_prob.pdf", width=4, height=3)
+# ggsave("posterior_pred_prob.pdf", width=4, height=3)
 ```
 
 

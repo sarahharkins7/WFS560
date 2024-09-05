@@ -393,11 +393,22 @@ samples_no_supp_y2 = sample(p_grid,
                     prob=posteriors_beta[[4]], 
                     size=10000, 
                     replace=TRUE) 
+post_diff_y2 = samples_supp_y2 - samples_no_supp_y2
+post_diff_y1 = samples_supp_y1 - samples_no_supp_y1
 
-posterior_diff_y2 =  (rbinom(length(samples_supp_y2), size=15, prob=samples_supp_y2) - rbinom(length(samples_no_supp_y2), size=15, prob=samples_no_supp_y2) )/15
+ggplot() + geom_histogram(aes(x=post_diff_y1, fill="Difference Y1"), alpha=0.2, position="dodge") +
+          geom_histogram(aes(x=post_diff_y2, fill="Difference Y2"), alpha=0.2, position="dodge") +
+		      scale_fill_manual(values=c("gray", "blue")) +
+		      xlab("Difference in Years 1 and 2") +
+		      ylab("Count in predictive posterior") +
+          #ggtitle("")+
+		      theme_classic()
 
 
-posterior_diff_y1 =  (rbinom(length(samples_supp_y1), size=15, prob=samples_supp_y1) - rbinom(length(samples_no_supp_y1), size=15, prob=samples_no_supp_y1) )/15
+posterior_diff_y2 =  rbinom(length(samples_supp_y2), size=15, prob=samples_supp_y2) - rbinom(length(samples_no_supp_y2), size=15, prob=samples_no_supp_y2) 
+
+
+posterior_diff_y1 =  rbinom(length(samples_supp_y1), size=15, prob=samples_supp_y1) - rbinom(length(samples_no_supp_y1), size=15, prob=samples_no_supp_y1) 
 
 ggplot() + geom_histogram(aes(x=posterior_diff_y1, fill="Difference Y1"), alpha=0.2, position="dodge") +
           geom_histogram(aes(x=posterior_diff_y2, fill="Difference Y2"), alpha=0.2, position="dodge") +
@@ -412,9 +423,9 @@ ggplot() + geom_histogram(aes(x=posterior_diff_y1, fill="Difference Y1"), alpha=
 From the above plot, we see that mode of the difference (supp. - no supp.) in year 2 is positive indicating that the difference of field usage by cranes is increased by food supplementation. In the year 1 plot, the mode of the difference of field usage is roughly 0, indicating there there is little to no difference in field usage when the fields are not supplemented. 
 
 ```{r}
-bounds_y1 = quantile(posterior_diff_y1, c(0.025, 0.975))
+bounds_y1 = quantile(post_diff_y1, c(0.025, 0.975))
 print(bounds_y1)
-bounds_y2 = quantile(posterior_diff_y2, c(0.025, 0.975))
+bounds_y2 = quantile(post_diff_y2, c(0.025, 0.975))
 print(bounds_y2)
 ```
 
