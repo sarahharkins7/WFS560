@@ -1,0 +1,133 @@
+---
+title: "Homework 2"
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Fitting linear models to understand within-host pathogen growth
+
+The amphibian chytrid fungus *Batrachochytrium dendrobatidis* (Bd) has led to the declines and extinctions of hundreds of amphibians across the globe.  The severity of the disease chytridiomycosis (caused by the pathogen Bd) depends on how infected individual amphibians are.  Thus, it is important to understand the dynamics of within-host pathogen growth.
+
+For this homework, you will analyze data on the dynamics of Bd growth on the endangered Mountain yellow-legged frog. In this experiment, frogs were kept at 12 C or 20 C, exposed to Bd, and swabbed every three days.  Swabbing the frog allows us to measure how much Bd is on frogs.  You are asking two questions:
+
+1. Is the growth rate of Bd on frogs different at 12 and 20 C?
+2. Is the predicted equilibrium Bd load on frogs different at 12 C and 20 C?  
+
+Because disease-induced mortality is load-dependent, you ultimately what to understand how manipulating temperature might affect infection dynamics and mortality.
+
+## The data
+
+The data are given in `bd_growth_data.csv`.  The columns are
+
+1. `logload_t`: Natural log of Bd load on a frog at time $t$
+2. `logload_tplus1`: Natural log of Bd load on a frog at time $t + 1$
+3. `temp`: Temperature of 12 or 20 C
+4. `individual`: Individual ID of frogs
+
+### Question 1
+
+Plot the relationship between `loadload_t` and `logload_tplus1` for 12 and 20 C.  Describe at least 2 characteristics of the relationship you are seeing.
+
+### Question 2
+
+On the natural scale, we might expect Bd load to follow the phenomenological, growth curve
+
+$$
+\mu(t + 1) = a x(t)^b
+$$
+where $\mu(t + 1)$ is the mean Bd load on the natural scale at time $t + 1$ on a frog and $x(t)$ is the observed Bd load on the natural scale at time $t$. $a$ is the per time step growth rate and $b < 1$ is the degree of density-dependence in Bd growth on the frog.  On the log scale, the Bd growth function is
+
+$$
+\log(\mu(t + 1)) = \log(a) + b \log(x(t))
+$$
+which we can recognize as a linear model with intercept $\log(a)$ and slope $b$.  The predicted equilibrium
+log load on a frog (conditional on no mortality and loss of infection) is
+
+$$
+\theta = \frac{\log(a)}{1 - b}
+$$
+**Your goal**
+
+Fit two Bayesian linear models, one for 12C and one for 20C, where your predictor variable is log Bd load at time $t$ ($log(x(t))$ or `logload_t`) and your response variable is log Bd load at time $t + 1$ ($log(x(t + 1))$ or `logload_tplus1`).
+
+For each model
+
+**Fitting the models**
+
+1. Write out your full model using the model notation we have been learning in class
+2. Discuss how you chose your prior distributions (it might be helpful to visually justify your prior distributions with prior prediction simulation plots)
+3. Fit each of your models using a quadratic approximation (show the code)
+4. Use posterior simulations and plots to test the validity of your fitted model (see the deer example from class as a template).  Discuss whether your data are meeting the assumptions of your model.
+
+**Making inference on the models**
+
+1. Using your fitted model, draw conclusions about three hypothesis relating to differences in Bd growth and load dynamics on frogs at different temperatures.
+  a. $log(a_{12}) = log(a_{20})$
+  b. $b_{12} = b_{20}$
+  c. $\theta_{12} = \theta_{20}$
+
+When drawing your conclusions, use plots of posterior distributions and credible intervals to support your answers.
+
+## Question 3
+
+Focus on the data from the experiment at 12 C. You may have noticed that one of the assumptions of our model was clearly violated -- there is not equal variance in log Bd load at time $t + 1$ across different values of log Bd load at time $t$.  In particular, it looks like variance in log Bd load at time $t + 1$ decreases as log Bd load at time $t$ get larger.  Failing to account for these differences in variances can substantially affect any inference we make about Bd growth dynamics.  Therefore, we want to model the patterns we see in variance.
+
+For Bayesian analysis, modeling heterogeneity in variance is straight-forward.  Consider the generic model with predictor variable $x$ and response variable $y$ and $i = 1, \dots, n$ observations.  My Bayesian linear regression without heterogeneity in variance might look like
+
+$$
+\begin{aligned}
+y_i &\sim \text{Normal}(\mu_i, \sigma) \\
+\mu_i &= \beta_0 + \beta_1 x_i \\
+\beta_0 &\sim \text{Normal}(0, 3) \\
+\beta_1 &\sim \text{Normal}(0, 3) \\
+\sigma &\sim \text{Exponential}(1)
+\end{aligned}
+$$
+
+Let's now say that the variance in $y$ clearly changes with $x$.  I can update my model by allowing $\sigma$ to be a function of $x$ ($f(x)$).
+
+$$
+\begin{aligned}
+y_i &\sim \text{Normal}(\mu_i, \sigma_i) \\
+\mu_i &= \beta_0 + \beta_1 x_i \\
+\beta_0 &\sim \text{Normal}(0, 3) \\
+\beta_1 &\sim \text{Normal}(0, 3) \\
+\sigma_i &= f(x_i)
+\end{aligned}
+$$
+So, you can model changes in variance, just like you model changes in the mean.  However, be careful that $\sigma$ has a clear lower bound of 0! So choose your functions appropriately so they don't go below zero (alternatively, you could model $\log(\sigma)$ which would eliminate this problem). A common choice is
+$\sigma_i = s e^{\alpha_1 x_i}$. With this function, if $x$ is centered (i.e., a mean of 0), then $s$ is the standard deviation in $y$ when $x$ is at its mean value. $\alpha_1$ describes how much log $\sigma$ changes (increases or decreases) with an increase in $x$.
+
+We can then write our model as 
+
+$$
+\begin{aligned}
+y_i &\sim \text{Normal}(\mu_i, \sigma_i) \\
+\mu_i &= \beta_0 + \beta_1 x_i \\
+\beta_0 &\sim \text{Normal}(0, 3) \\
+\beta_1 &\sim \text{Normal}(0, 3) \\
+\sigma_i &= s e^{\alpha_1 x_i} \\
+s &\sim \text{Prior} \\
+\alpha_1 &\sim \text{Prior}
+\end{aligned}
+$$
+where we have one additional parameter to estimate, $\alpha_1$. I am purposefully not specifying the forms of the priors as this is part of what you will have to do.
+
+**Fitting the model**
+
+1. Fully write-out the model with non-constant variance for Bd load dynamics on frogs at 12 C (you don't need to do it at 20 C). 
+2. Clearly specify what prior distributions you are choosing for your new parameters and why.
+3. Fit the model using `quap` and answer the question: Does our model support the hypothesis that variance in Bd load at time $t + 1$ is decreasing with increasing Bd load at time $t$?  Justify your answer with a plot, point estimate, and credible interval.
+
+### Bonus question: Propogating uncertainty to model simulation
+
+Use your model you fit in Question 3 to simulate 1000 predicted trajectories of log Bd growth on an individual frog that are 10 time steps long, propagating your uncertainty in your parameter estimates through your model simulations.  Assume that all trajectories start with a log Bd load of 0. 
+
+To get started, remember that the dynamics of Bd growth on a frog are described by 
+
+$$
+\log(\mu(t + 1)) = \log(a) + b \log(x(t))
+$$
+This is just an update equation and, given a starting value (i.e., log Bd load is 0), you can draw a realization of Bd load at the next time step.  For a given set of parameters, you will want to repeat this 10 times, draw a new set of parameters, and do it again.  Plot the 1000 trajectories and summarize the uncertainty in the trajectories using 95% credible ribbons (see `geom_ribbon`).
+

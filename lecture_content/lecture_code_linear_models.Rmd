@@ -191,10 +191,10 @@ deer_plot = ggplot(deer_data) + geom_point(aes(x=average_doe_weight, y=average_b
 					ylab('Average buck antler score (inches)')
 deer_plot + geom_hline(aes(yintercept=129))
 
-ggsave("deer_data_horizontal_line.pdf", width=4, height=3)
+# ggsave("deer_data_horizontal_line.pdf", width=4, height=3)
 
 deer_plot + geom_smooth(aes(x=average_doe_weight, y=average_buck_antler_score), method="lm", se=FALSE)
-ggsave("deer_data_slope_line.pdf", width=4, height=3)
+# ggsave("deer_data_slope_line.pdf", width=4, height=3)
 ```
 
 ```{r}
@@ -206,8 +206,8 @@ library(data.table)
 library(rethinking)
 
 n = 10000
-ints = rnorm(n, 128, 10)
-slopes = rnorm(n, 0, 5)
+ints = rnorm(n, 128, 10) # draw 10,000 beta_0's
+slopes = rnorm(n, 0, 5) # draw 10,000 slopes'
 scaled_weight = deer_data$average_doe_weight - mean(deer_data$average_doe_weight)
 vals = seq(min(scaled_weight), max(scaled_weight), len=50)
 p1 = ggplot() + geom_density(aes(ints)) + 
@@ -221,6 +221,8 @@ p2 = ggplot() + geom_density(aes(slopes)) +
 
 
 lines = sapply(vals, function(x) ints[1:100] + x*slopes[1:100])
+# dim(lines)
+
 lines_dt = data.table(data.frame(t(lines)))
 lines_dt$scaled_weight = vals
 lines_melt = melt(lines_dt, id.vars="scaled_weight")
@@ -229,7 +231,7 @@ p3 = ggplot(lines_melt) + geom_line(aes(x=scaled_weight, y=value, group=variable
 						  ylab("Buck antler score")
 
 (p1 + p2) / p3
-ggsave("prior_predictions.pdf", height=5, width=6)
+# ggsave("prior_predictions.pdf", height=5, width=6)
 ```
 
 ```{r}
@@ -275,7 +277,7 @@ p3 = ggplot(lines_melt) + geom_line(aes(x=scaled_weight, y=value, group=variable
 						  ylab("Buck antler score")
 (p1 + p2) / p3
 
-ggsave("prior_and_posterior.pdf", height=5, width=6)
+# ggsave("prior_and_posterior.pdf", height=5, width=6)
 ```
 
 ```{r}
@@ -306,7 +308,7 @@ p3 = ggplot() +
 						  ylab("Buck antler score")
 (p1 + p2) / p3
 
-ggsave("just_posterior.pdf", height=5, width=6)
+# ggsave("just_posterior.pdf", height=5, width=6)
 ```
 
 ```{r}
@@ -324,9 +326,10 @@ pweights_scaled = pweights - mean(deer_data$average_doe_weight)
 
 pred_mean = sapply(pweights_scaled, function(x) beta0 + x*beta1)
 
+hist(pred_mean[,1]) #histogram of first column
+
 # Alternative approach
 # pred_mean = link(mod1, data=list(average_doe_weight=pred_weights), n=10000)
-
 
 # Step 5. Summarize
 median_pred = apply(pred_mean, 2, median)
@@ -334,7 +337,7 @@ lowerupper_pred = apply(pred_mean, 2, function(x) quantile(x, c(0.025, 0.975)))
 pred_df = data.frame(med=median_pred, 
 					 lower=lowerupper_pred[1, ], 
 					 upper=lowerupper_pred[2, ],
-					 pred_weights=pred_weights)
+					 pred_weights=pweights)
 
 # Step 6. Visualize
 p1 = ggplot() + geom_point(data=deer_data, aes(x=average_doe_weight, y=average_buck_antler_score, color="Observed")) +
@@ -345,8 +348,8 @@ p1 = ggplot() + geom_point(data=deer_data, aes(x=average_doe_weight, y=average_b
 		   scale_fill_manual(values=c('blue')) +
 		   theme_classic() +
 		   xlab("Doe body weight (lb)") + ylab("Buck antler score (in)")
-
-ggsave("mean_predictions.pdf", width=6, height=4)
+p1
+# ggsave("mean_predictions.pdf", width=6, height=4)
 # upper_pred = apply(pred_mean, 2, function(x), quantile(x, 0.975))
 ```
 
@@ -363,7 +366,7 @@ pweights = seq(min(deer_data$average_doe_weight),
 				   max(deer_data$average_doe_weight), len=50)
 pweights_scaled = pweights - mean(deer_data$average_doe_weight)
 
-pred_distribution = sapply(pweights_scaled, function(x) rnorm(n, beta0 + x*beta1, sigma))
+pred_distribution = sapply(pweights_scaled, function(x) rnorm(n, beta0 + x*beta1, sigma)) # drawing random antler score 
 
 # Step 5. Summarize
 median_pred_dist = apply(pred_distribution, 2, median)
@@ -383,14 +386,14 @@ p2 = ggplot() + geom_point(data=deer_data, aes(x=average_doe_weight, y=average_b
 		   scale_fill_manual(values=c('blue', 'red')) +
 		   theme_classic() +
 		   xlab("Doe body weight (lb)") + ylab("Buck antler score (in)")
-
-ggsave("mean_pred_predictions.pdf", width=6, height=4)
+p2
+#ggsave("mean_pred_predictions.pdf", width=6, height=4)
 ```
 
 Another useful way to check on the model predictions is to use the `postcheck` function in the `rethinking` package
 
 ```{r}
-postcheck(mod1)
+#postcheck(mod1)
 ```
 
 Challenge questions
@@ -407,6 +410,8 @@ sigma = post[, 3]
 # Question 1: Mean distribution
 mu = beta0 + beta1*(145 - mean(deer_data$average_doe_weight))
 mean(mu > 150)
+hist(mu)
+
 
 # Question 2: Predictive distribution 
 pred = rnorm(n, mean=mu, sd=sigma)
@@ -458,15 +463,15 @@ p1 = ggplot() + geom_point(data=deer_data, aes(x=average_doe_weight, y=average_b
 		   scale_fill_manual(values=c('blue')) +
 		   theme_classic() +
 		   xlab("Doe body weight (lb)") + ylab("Buck antler score (in)")
-
-ggsave("mean_predictions_nonlinear.pdf", width=6, height=4)
+p1
+# ggsave("mean_predictions_nonlinear.pdf", width=6, height=4)
 ```
 
 ```{r}
 library(splines)
 
-num_knots = 1
-knot_list = quantile(deer_data$average_doe_weight, c(0.5))
+num_knots = 1 # how many times you slice up the data 
+knot_list = quantile(deer_data$average_doe_weight, c(0.5)) #splitting data in half 
 deer_data_dt = data.table(deer_data)
 dd = ggplot(deer_data) + geom_point(aes(x=average_doe_weight, 
 								y=average_buck_antler_score)) + 
@@ -474,30 +479,33 @@ dd = ggplot(deer_data) + geom_point(aes(x=average_doe_weight,
 					theme_classic() +
 		   			xlab("Doe body weight (lb)") + 
 		   			ylab("Buck antler score (in)")
-ggsave("split_deer_data.pdf", width=5, height=4)
-
+#ggsave("split_deer_data.pdf", width=5, height=4)
+dd
 dd2 = dd + geom_smooth(data=deer_data_dt[average_doe_weight <= knot_list], 
 					aes(x=average_doe_weight, y=average_buck_antler_score), 
 					method="lm", se=FALSE)
-
-ggsave("split_deer_data1.pdf", width=5, height=4)
+dd2
+#ggsave("split_deer_data1.pdf", width=5, height=4)
 
 dd3 = dd2 + geom_smooth(data=deer_data_dt[average_doe_weight > knot_list], 
 					aes(x=average_doe_weight, y=average_buck_antler_score), 
 					method="lm", se=FALSE)
 
-ggsave("split_deer_data2.pdf", width=5, height=4)
+dd3
+#ggsave("split_deer_data2.pdf", width=5, height=4)
 ```
 
 ```{r}
 # Set up your Bspline
 # Check the dimensions of B. You are fitting two cubic splines with 4 parameters each
 # and the continuity constraint removes three of those parameters so 5 total parameters
-# Play around with degree 1 (linear), 2 (quadradtic), and 3 (cubic)
-B = bs(deer_data$average_doe_weight, knots=knot_list, 
-	   degree=3, intercept=TRUE)
+# Play around with degree 1 (linear), 2 (quadratic), and 3 (cubic)
+B = bs(deer_data$average_doe_weight, 
+       knots=knot_list, 
+	     degree=3,  #from cell one prior 
+	     intercept=TRUE)
 
-
+head(B)
 mod_bspline = quap(
 			alist(
 				y ~ dnorm(mu, sigma),
@@ -528,7 +536,9 @@ mod_bspline1 = quap(
 
 
 new_data = seq(min(deer_data$average_doe_weight), 
-			   max(deer_data$average_doe_weight), len=100)
+			   max(deer_data$average_doe_weight), len=100) # a range of doe body weights 
+new_data
+
 newB = predict(B, new_data)
 pred_mean = link(mod_bspline, data=list(B=newB),
 				n=10000)
@@ -538,7 +548,7 @@ lowerupper_pred = apply(pred_mean, 2, function(x) quantile(x, c(0.025, 0.975)))
 pred_df = data.frame(med=median_pred, 
 					 lower=lowerupper_pred[1, ], 
 					 upper=lowerupper_pred[2, ],
-					 pred_weights=new_weights + mean(deer_data$average_doe_weight))
+					 pred_weights=new_data )
 
 p1 = ggplot() + geom_point(data=deer_data, aes(x=average_doe_weight, y=average_buck_antler_score, color="Observed")) +
 		   geom_line(data=pred_df, aes(x=pred_weights, y=med, color="Mean prediction")) + 
@@ -550,10 +560,10 @@ p1 = ggplot() + geom_point(data=deer_data, aes(x=average_doe_weight, y=average_b
 		   theme_classic() +
 		   guides(fill="none", color="none") +
 		   xlab("Doe body weight (lb)") + ylab("Buck antler score (in)")
+p1
+#ggsave("mean_predictions_spline.pdf", width=5, height=4)
 
-ggsave("mean_predictions_spline.pdf", width=5, height=4)
-
-p1 = ggplot() + geom_point(data=deer_data, aes(x=average_doe_weight, y=average_buck_antler_score, color="Observed")) +
+p2 = ggplot() + geom_point(data=deer_data, aes(x=average_doe_weight, y=average_buck_antler_score, color="Observed")) +
 		   geom_line(data=pred_df, aes(x=pred_weights, y=med, color="Mean prediction")) + 
 		   geom_ribbon(data=pred_df, aes(x=pred_weights, ymin=lower, ymax=upper, fill="95% CI\naround mean"), 
 		   								 alpha=0.2) +
@@ -562,20 +572,24 @@ p1 = ggplot() + geom_point(data=deer_data, aes(x=average_doe_weight, y=average_b
 		   scale_fill_manual(values=c('blue')) +
 		   theme_classic() +
 		   xlab("Doe body weight (lb)") + ylab("Buck antler score (in)")
-
-ggsave("mean_predictions_spline_legend.pdf", width=6, height=4)
+p2
+#ggsave("mean_predictions_spline_legend.pdf", width=6, height=4)
 
 ```
 
 What is the probability that a specific doe population with an average body weight of 140 lbs will have bucks with an average antler score of 140 or greater?
 
+
 ```{r}
 
 # Make a new prediction, convert 150 to B-spline
-newB = predict(B, c(140))
+newB = predict(B, c(140)) 
 pred_deer = link(mod_bspline, data=list(B=newB), n=10000)
+    # the link function creates mean predictions given body weight is 140 from the argument data = list(B=newB)
 mean(pred_deer > 140)
+hist(pred_deer)
 
+lppd(mod_bspline) # log likelihood 
 ```
 
 
