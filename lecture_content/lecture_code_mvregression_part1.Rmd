@@ -1,0 +1,644 @@
+---
+title: 'Lecture code: Multivariate Regression'
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+library(data.table) # I don't use tidyverse, but do your own thing if you want
+library(dagitty)
+library(GGally)
+```
+
+```{r}
+library(GGally)
+svl_data = read.csv("tadpole_svl.csv")
+head(svl_data)
+svl_data$svl
+
+ggpairs(svl_data)
+ggsave("cor_plot.pdf", width=10, height=4)
+```
+
+```{r}
+# Standardize algae
+svl_data$algae_z = with(svl_data, (algae - mean(algae)) / sd(algae))
+svl_data$algae_z
+```
+
+What is standardization doing?
+
+```{r}
+library(patchwork)
+
+n = 10000
+x = rnorm(n, mean=20, sd=2)
+x_z = (x - mean(x)) / sd(x)
+tdat = data.frame(vals=c(x, x_z), 
+				 type=rep(c("Original", "Standardized"), c(n, n)))
+ggplot(data=tdat) + geom_histogram(aes(x=vals)) + facet_wrap(~type, scales='free') + theme_classic() + xlab("x values")
+
+# ggsave("compare_hists.pdf", width=8, height=4)
+
+
+```
+
+```{r}
+library(data.table)
+
+# Standardize
+svl_data$algae_z = with(svl_data, (algae - mean(algae)) / sd(algae))
+svl_data$svl_z = with(svl_data, (svl - mean(svl)) / sd(svl))
+
+# Prior simulation
+n = 50
+beta0 = rnorm(n, 0, 2)
+beta1 = rnorm(n, 0, 2)
+vals = seq(min(svl_data$algae_z), max(svl_data$algae_z), len=100)
+
+prior_lines = sapply(1:n, function(i) beta0[i] + beta1[i]*vals)
+prior_dt = data.table(prior_lines)
+prior_dt$algae_z = vals
+prior_melt = melt(prior_dt, id.vars="algae_z")
+ggplot(prior_melt) + geom_line(aes(x=algae_z, y=value, group=variable)) + theme_classic() + xlab("algae_z") + ylab("svl_z")
+
+#ggsave("prior_simulations.pdf", width=4, height=3)
+
+```
+
+Fit the model with standardized variables
+
+```{r}
+library(rethinking)
+svl_data$algae_z = with(svl_data, (algae - mean(algae)) / sd(algae))
+svl_data$svl_z = with(svl_data, (svl - mean(svl)) / sd(svl))
+
+mod1 = quap(
+		alist(
+			  svl_z ~ dnorm(mu, sigma),
+			  mu <- beta0 + beta1*algae_z,
+			  beta0 ~ dnorm(0, 2),
+			  beta1 ~ dnorm(0, 2),
+			  sigma ~ dexp(1)
+				), data=svl_data)
+precis(mod1, prob=0.95)
+
+# Plot the posteriors
+post = extract.samples(mod1, n=10000)
+beta1 = post[, 2] # effect size 
+sd_svl = sd(svl_data$svl); sd_alg = sd(svl_data$algae)
+beta1_unstd = beta1*(sd_svl / sd_alg) # posterior for unstandardized (untransformed) scale 
+precis(beta1_unstd, prob=0.95)
+
+pdf("density_plot.pdf", width=5, height=3)
+dens(post[, -3])
+dev.off()
+
+# Check that fitting the de-meaned algae gives the same result
+mod2 = quap(
+		alist(
+			  svl ~ dnorm(mu, sigma),
+			  mu <- beta0 + beta1*(algae - mean(algae)),
+			  beta0 ~ dnorm(67, 4),
+			  beta1 ~ dnorm(0, 20),
+			  sigma ~ dunif(0, 100)
+				), data=svl_data)
+mod2
+
+# Also check with a frequentist approach
+summary(lm(svl ~ algae, data=svl_data))
+
+```
+
+Check the single variable model
+
+```{r}
+library(patchwork)
+
+# Check linearity
+algae_pred = seq(min(svl_data$algae_z),
+				 max(svl_data$algae_z), 
+				 len=100)
+# Simulate predictions
+pred_dt = data.frame(algae_z=algae_pred)
+pred = link(mod1, data=pred_dt)
+pred_dt$med = apply(pred, 2, median)
+pred_dt$lower =  apply(pred, 2, quantile, 0.025)
+pred_dt$upper =  apply(pred, 2, quantile, 0.975)
+
+ggplot(svl_data) + geom_point(aes(x=algae_z, y=svl_z)) + 
+				   geom_line(data=pred_dt, aes(x=algae_z, y=med), color='blue') +
+				   geom_ribbon(data=pred_dt, aes(x=algae_z, ymin=lower, ymax=upper), fill='blue', alpha=0.1) +
+				   theme_classic()
+
+# ggsave("mod1_predictions.pdf", width=4, height=3)
+```
+
+```{r}
+# Median residuals
+pred2 = link(mod1, n = 1,000) #predicted posterior distribution for each point in data set 
+                              # n=1,000 is the default number of samples per point 
+
+hist(pred2[,1]) # predicted of svl_z posterior distribution of mean for first data point
+
+mean_pred = colMeans(pred2) # mean across all of the data 
+resid = svl_data$svl_z - mean_pred # compute residual (observed - predicted svl)
+
+# QQplot to check normality
+df = data.frame(resid=resid, x=svl_data$algae_z)
+p = ggplot(df, aes(sample = resid))
+pq = p + stat_qq() + stat_qq_line() + theme_classic()
+
+# Residual plot to check equal variance
+pr = ggplot(df, aes(x=x, y=resid)) + geom_point() + geom_hline(aes(yintercept=0), linetype="dashed") + xlab("algae_z") + ylab("residual") + theme_classic()
+pq + pr
+# ggsave("resid_plots.pdf", width=7, height=3)
+
+
+```
+
+```{r}
+
+# Calculate the Bayesian R2 with uncertainty
+pred2 = link(mod1, n=10000)
+all_resid = t(svl_data$svl_z - t(pred2)) # calculate residual for all points in posterior distribution
+resid_var = apply(all_resid, 1, var)
+mean_var =  apply(pred2, 1, var)
+R2 = mean_var / (mean_var + resid_var) # this is a distribution! 
+
+median(R2) # reportable conclusion along with the 95% confidence/credible interval
+
+ggplot() + geom_histogram(aes(x=R2)) + 
+		   geom_vline(aes(xintercept=median(R2)), linetype="dashed", linewidth=1) +
+		   theme_classic()
+
+# ggsave("bayesian_r2.pdf", width=4, height=3)
+
+
+```
+
+```{r}
+
+# Classic biostats
+
+full_mod = lm(svl ~ density*area + algae*nutr, data=svl_data)
+best = step(full_mod, direction="both") # drops anf includes variables to find the one with the lowest AIC, thus producing the best model 
+summary(best, direction="both")
+
+```
+
+
+Making DAGs in R
+
+```{r}
+library(dagitty)
+# Draw example DAG
+dag_ex <- dagitty("dag{
+Nutr -> SVL
+Nutr -> Algae
+Algae -> SVL
+SVL [outcome]
+}")
+
+coordinates(dag_ex) <- list(x=c(Nutr=1, Algae=3, SVL=2),
+						  y=c(Nutr=0, Algae=0, SVL=3))
+
+pdf("dag_example1.pdf", width=4, height=3)
+rethinking::drawdag(dag_ex)
+dev.off()
+
+dag_ex2 <- dagitty("dag{
+Nutr -> SVL
+Nutr -> Algae
+Algae -> SVL
+SVL [outcome]
+}")
+
+coordinates(dag_ex2) <- list(x=c(Nutr=1, Algae=3, SVL=2),
+						  y=c(Nutr=0, Algae=0, SVL=3))
+
+pdf("dag_example2.pdf", width=4, height=3)
+rethinking::drawdag(dag_ex2)
+dev.off()
+
+dag_ex3 <- dagitty("dag{
+Nutr -> SVL
+Algae -> SVL
+SVL [outcome]
+}")
+
+coordinates(dag_ex3) <- list(x=c(Nutr=1, Algae=3, SVL=2),
+						  y=c(Nutr=0, Algae=0, SVL=3))
+
+pdf("dag_example3.pdf", width=4, height=3)
+rethinking::drawdag(dag_ex3)
+dev.off()
+
+
+dag_ex4 <- dagitty("dag{
+GoodLooking -> Actor
+Funny -> Actor
+Actor [outcome]
+}")
+
+coordinates(dag_ex4) <- list(x=c(GoodLooking=1, Funny =3, Actor=2),
+						  y=c(GoodLooking=0, Funny=0, Actor=3))
+
+pdf("dag_example4.pdf", width=4, height=3)
+rethinking::drawdag(dag_ex4)
+dev.off()
+
+
+dag_ex5 <- dagitty("dag{
+Nutr -> SVL
+Algae -> SVL
+SVL -> Repro
+}")
+
+coordinates(dag_ex5) <- list(x=c(Nutr=1, Algae=3, SVL=2, Repro=2),
+						  y=c(Nutr=0, Algae=0, SVL=2, Repro=3))
+
+pdf("dag_example5.pdf", width=4, height=3)
+rethinking::drawdag(dag_ex5)
+dev.off()
+
+
+```
+
+```{r}
+
+taddag <- dagitty("dag{
+Area -> Density -> SVL
+Area -> Algae -> Density
+Nutr -> Algae -> SVL
+Nutr -> SVL
+Area [exposure]
+SVL [outcome]
+}")
+
+
+coordinates(taddag) <- list(x=c(Area=1, Algae=5, Density=5,
+                              Nutr = 5,SVL=10),
+							y=c(Area=5, Algae=5, Density=9,
+								Nutr = 1, SVL=5))
+
+
+#pdf("tad_diag.pdf", width=4, height=3)
+rethinking::drawdag(taddag)
+dev.off()
+
+# What do you need to hold constant to get the direct effect of algae
+adjustmentSets(taddag, exposure="Algae", outcome="SVL", effect="direct")
+
+# What do you need to hold constant to get the total effect of algae?
+adjustmentSets(taddag, exposure="Algae", outcome="SVL", effect="total")
+
+```
+
+
+```{r}
+
+taddag2 <- dagitty("dag{
+Area -> Algae -> SVL
+Area -> SVL
+Nutr -> Algae
+Density -> SVL
+Area [exposure]
+SVL [outcome]
+}")
+
+coordinates(taddag2) <- list(x=c(Area=1, Algae=5, Density=1,
+                              Nutr = 1, SVL=10),
+                         y=c(Area=1, Algae=5, Density=9,
+                             Nutr = 5, SVL=5))
+
+#pdf("tad_diag2.pdf", width=4, height=3)
+rethinking::drawdag(taddag2)
+dev.off()
+```
+
+Build a Bayesian multiple regression
+
+```{r}
+# Quick way to standardize your dataset
+svl_data_z = as.data.frame(scale(svl_data))
+svl_data_z
+
+tadmod = quap(
+			alist(
+				svl ~ dnorm(mu, sigma),
+				mu <- beta0 + beta_algae*algae + beta_nutr*nutr + beta_density*density,
+				beta0 ~ dnorm(0, 5),
+				beta_algae ~ dnorm(0, 2),
+				beta_nutr ~ dnorm(0, 2),
+				beta_density ~ dnorm(0, 2),
+				sigma ~ dexp(1)
+				), data=svl_data_z)
+precis(tadmod, prob=0.95)
+
+# Extract effects on the svl scale
+post = extract.samples(tadmod, n=1000)
+beta_nat = post[, 2] * sd(svl_data$svl) # unstandardized in the y variable 
+precis(beta_nat, prob=0.95)
+
+#pdf("algae_effect.pdf", width=4, height=3)
+hist(beta_nat, xlab="Algae effect on svl (mm) ", main="")
+dev.off()
+
+
+# Get the total effect of algae 
+tadmod2 = quap(
+      alist(
+        svl ~ dnorm(mu, sigma),
+        mu <- beta0 + beta_algae*algae + beta_nutr*nutr + beta_area*area,
+        beta0 ~ dnorm(0, 5),
+        beta_algae ~ dnorm(0, 2),
+        beta_nutr ~ dnorm(0, 2),
+        beta_area ~ dnorm(0, 2),
+        sigma ~ dexp(1)
+        ), data=svl_data_z)
+precis(tadmod2, prob=0.95)
+
+```
+
+Test your DAGs dependencies
+
+```{r}
+library(dagitty) # Package for building DAGs
+
+# Build your DAG
+dag2 <- dagitty("dag{
+Area -> Density -> SVL
+Area -> Algae -> Density
+Nutr -> Algae -> SVL
+Nutr -> SVL
+}")
+
+# Format your DAG
+coordinates(dag2) <- list(x=c(Area=1, Algae=5, Density=5,
+                              Nutr = 1, SVL=10),
+                         y=c(Area=5, Algae=5, Density=9,
+                         	Nutr = 1, SVL=5))
+# Visualize DAG
+rethinking::drawdag(dag2)
+
+# Look at implied dependencies
+impliedConditionalIndependencies(dag2)
+
+```
+
+Check that our DAG is consistent with our data
+
+```{r}
+
+
+# Condition 1: Area and Nutr should be uncorrelated
+
+# Area is predictor variable and Nutr is response variable 
+test1 = quap(
+			alist(
+				area ~ dnorm(mu, sigma),
+				mu <- b0 + b1*nutr,
+				b0 ~ dnorm(0, 5),
+				b1 ~ dnorm(0, 2),
+				sigma ~ dexp(1)), data=svl_data_z)
+precis(test1, prob=0.95)
+# the 95% confidence interval of b1 overlaps with 0 so there is not a strong correlation between the variables 
+
+# Condition 2: Area and SVL should be uncorrelated given
+# algae, density, and nutr
+test2 = quap(
+			alist(
+				# R1
+				svl ~ dnorm(mu, sigma),
+				mu <- b0 + b4*algae + 
+						    b3*density +
+						    b2*nutr +
+						    b1*area,
+				b0 ~ dnorm(0, 5),
+				b1 ~ dnorm(0, 2),
+				b2 ~ dnorm(0, 2),
+				b3 ~ dnorm(0, 2),
+				b4 ~ dnorm(0, 2),
+				sigma ~ dexp(1)), data=svl_data_z)
+precis(test2, prob=0.95)
+
+# Condition 3: Density and nutrient are not related after controlling
+# for algae and area
+test3 = quap(
+			alist(
+				density ~ dnorm(mu, sigma),
+				mu <- b0 + b3*algae + 
+						    b2*area +
+						    b1*nutr,
+				b0 ~ dnorm(0, 5),
+				b1 ~ dnorm(0, 2),
+				b2 ~ dnorm(0, 2),
+				b3 ~ dnorm(0, 2),
+				sigma ~ dexp(1)), data=svl_data_z)
+precis(test3, prob=0.95)
+
+# Plot the coefficient estimates
+all_coefs = list()
+mods = list(test1=test1, test2=test2, test3=test3)
+for(i in 1:length(mods)){
+	mod = mods[[i]]
+	tpost = extract.samples(mod)$b1
+	ests = quantile(tpost, c(0.025, 0.5, 0.975))
+	tdt = data.frame(model_nm=names(mods)[i], 
+					 med=ests[2], 
+					 lower=ests[1],
+					 upper=ests[3])
+	all_coefs[[i]] = tdt
+}
+all_coefs_dt = do.call(rbind, all_coefs)
+ggplot(all_coefs_dt) + geom_point(aes(y=model_nm, x=med)) +
+					   geom_errorbarh(aes(y=model_nm, 
+					   					  xmin=lower, 
+					   					  xmax=upper),
+					   					height=0.1) +
+					   geom_vline(aes(xintercept=0), linetype="dashed") +
+					   theme_classic() + ylab("Conditional independency") + xlab("Relationship value")
+#ggsave("test_dag.pdf", width=4, height=3)
+
+# Compare the b1 coefficients across models
+# pdf("test_dag.pdf", width=4, height=3)
+# plot(coeftab(test1, test2, test3), pars="b1", prob=0.95, main="", xlab="")
+# dev.off()
+
+
+```
+
+Check some basic model assumptions
+
+```{r}
+
+# Median residuals
+pred2 = link(tadmod2)
+mean_pred = colMeans(pred2)
+resid = svl_data$svl_z - mean_pred
+
+# QQplot to check normality
+df = data.frame(resid=resid, x=mean_pred)
+p = ggplot(df, aes(sample = resid))
+pq = p + stat_qq() + stat_qq_line() + theme_classic()
+
+# Residual plot to check equal variance
+pr = ggplot(df, aes(x=x, y=resid)) + geom_point() + geom_hline(aes(yintercept=0), linetype="dashed") + xlab("fitted value") + ylab("residual") + theme_classic()
+pq + pr
+ggsave("resid_plots_full_model.pdf", width=7, height=3)
+
+
+```
+
+Build and simulate DAGs
+
+```{r}
+
+taddag <- dagitty("dag{
+Area -> Density [beta = 1]
+Density -> SVL
+Area -> Algae -> Density
+Nutr -> Algae -> SVL
+Nutr -> SVL
+}")
+
+coordinates(taddag) <- list(x=c(Area=1, Algae=5, Density=5,
+                              Nutr = 1, SVL=10),
+                         y=c(Area=5, Algae=5, Density=9,
+                         	Nutr = 1, SVL=5))
+
+rethinking::drawdag(taddag)
+
+# Simulate the causal model specified above
+n = 10000 # Number of samples
+nutr = rnorm(n) # Independent 
+area = rnorm(n) # Independent
+algae = rnorm(n, nutr + area)
+density = rnorm(n, -area + algae)
+svl = rnorm(n, -density + 0.5*algae - nutr)
+
+dat = data.frame(density=density,
+				 nutr=nutr,
+				 area=area,
+				 algae=algae,
+				 svl=svl)
+head(dat, n=3)
+
+# Simulation
+n = 100
+nutr = rnorm(n)
+area = rnorm(n)
+algae = seq(-2, 2, len=n) # Fix algae
+density = rnorm(n, -area + algae)
+svl = rnorm(n, -density + 0.5*algae - nutr)
+
+dat = data.frame(density=density,
+         nutr=nutr,
+         area=area,
+         algae=algae,
+         svl=svl)
+
+p1 = ggplot(dat) + geom_point(aes(x=algae, y=svl)) + theme_classic()
+p1
+#ggsave("counterfactual_algae.pdf", width=4, height=3)
+
+# Simulation
+n = 100
+nutr = rnorm(n)
+area = rnorm(n)
+algae = seq(-2, 2, len=n) # Fix algae
+density = rep(0, n)
+svl = rnorm(n, -density + 0.5*algae - nutr)
+
+dat = data.frame(density=density,
+         nutr=nutr,
+         area=area,
+         algae=algae,
+         svl=svl)
+
+p2 = ggplot(dat) + geom_point(aes(x=algae, y=svl)) + theme_classic()
+#ggsave("counterfactual_algae_density.pdf", width=4, height=3)
+```
+
+Estimate the full causal model
+
+```{r}
+
+# Fit the full causal model to estimate algae 
+# manipulation
+full_mod = quap(
+	alist(
+		# Algae -> SVL <- nutr, <- density
+		svl ~ dnorm(mu1, sigma1),
+		mu1 <- a0 + a_a*algae + a_d*density + a_n*nutr,
+		a0 ~ dnorm(0, 5),
+		a_a ~ dnorm(0, 2),
+		a_d ~ dnorm(0, 2),
+		a_n ~ dnorm(0, 2),
+		sigma1 ~ dexp(1),
+		# Algae -> density
+		density ~ dnorm(mu2, sigma2),
+		mu2 <- b0 + b_a*algae,
+		b0 ~ dnorm(0, 5),
+		b_a ~ dnorm(0, 2),
+		sigma2 ~ dexp(1),
+		# Nutrient -> SVL
+		nutr ~ dnorm(mu3, sigma3),
+		mu3 ~ dnorm(0, 5),
+		sigma3 ~ dexp(1)
+		), data=svl_data_z)
+
+algae = seq(-2, 2, len=30)
+sim_data = data.frame(algae=algae)
+s = sim(full_mod, data=sim_data, vars=c("nutr", "density", "svl"), n=10000)
+
+
+
+med = apply(s$svl, 2, quantile, 0.5)
+lower = apply(s$svl, 2, quantile, 0.025)
+upper = apply(s$svl, 2, quantile, 0.975)
+s_dt = data.frame(algae=algae, med=med, 
+				  lower=lower, upper=upper)
+
+ggplot(s_dt) + geom_line(aes(x=algae, y=med)) +
+			   geom_ribbon(aes(x=algae, ymin=lower, 
+			   				   ymax=upper), alpha=0.2) + theme_classic() +
+			   xlab("Algae") + ylab("SVL")
+# ggsave("algae_counterfactual.pdf", width=4, height=3)
+
+
+
+```
+
+# Simulate tadpole data used in this example
+
+```{r}
+
+
+# Generate tadpole data
+set.seed(25)
+n = 25
+nutr = rnorm(n)
+area = rnorm(n)
+algae = rnorm(n, nutr + area)
+density = rnorm(n, -area + algae)
+svl = rnorm(n, -density + 0.5*algae - nutr)
+
+# Scale biologically
+dat = data.frame(density=10 + 2*density,
+				 nutr=0.002 + 0.0005*nutr,
+				 area=10 + 2*area,
+				 algae=3*algae,
+				 svl=65 + 15*svl)
+
+write.csv(dat, "tadpole_svl.csv", row.names=FALSE)
+
+```
+
+
+
+
+

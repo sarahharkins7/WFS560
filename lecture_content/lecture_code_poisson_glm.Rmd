@@ -1,0 +1,487 @@
+---
+title: 'Lecture code: GLMs part 2, Poisson GLM'
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Load the amphibian data
+
+```{r}
+library(ggplot2)
+library(rethinking)
+library(patchwork)
+library(data.table)
+```
+
+# Read in the amphibian count data
+
+```{r}
+
+colo_dat = read.csv("colo_count_data.csv")
+head(colo_dat)
+
+ggplot(colo_dat) + geom_point(aes(x=year, y=count)) + facet_wrap(~site) +
+			    theme_classic() + xlab("Year") + ylab("Count")
+
+#ggsave("colo_data.pdf", width=5, height=3)
+```
+
+# Explore the Poisson distribution
+
+```{r}
+
+p1 = rpois(1000, 10)
+p2 = rpois(1000, 1)
+
+ggplot() + geom_bar(aes(x=p1, fill="lambda = 10"), alpha=0.5) +
+		 geom_bar(aes(x=p2, fill="lambda = 1"), alpha=0.5) +
+		 theme_classic() + xlab("Count of events") +
+		 theme(legend.position="inside",  legend.position.inside=c(0.8, 0.8))
+
+#ggsave("poisson_plot.pdf", width=4, height=3)
+```
+
+# Fit our first Poisson model
+
+```{r}
+
+# Set-up data for analysis
+colo_dat$year_z = scale(colo_dat$year)
+colo_dat$survey_effort_minutes_z = scale(colo_dat$survey_effort_minutes)
+colo_dat$survey_time_id = coerce_index(as.factor(colo_dat$survey_time))
+colo_dat$site_id = coerce_index(as.factor(colo_dat$site))
+colo_dat$wet_or_dry_id = coerce_index(as.factor(colo_dat$wet_or_dry))
+
+
+frog_mod1 = alist(
+		count ~ dpois(mu),
+		log(mu) <- beta1[survey_time_id] + beta2*survey_effort_minutes_z + 
+			  gamma1[site_id] + gamma2[wet_or_dry_id] + gamma3*year_z,
+		beta1[survey_time_id] ~ dnorm(1, 1), 
+		beta2 ~ dnorm(0, 0.75),
+		gamma1[site_id] ~ dnorm(1, 1),
+		gamma2[wet_or_dry_id] ~ dnorm(1, 1),
+		gamma3 ~ dnorm(0, 0.75)
+	)
+```
+
+# Prior predictive simulation
+
+```{r}
+# What are we predicting about the yearly slope for sites
+
+num = 500
+site_int = rnorm(num, 1, 1) # draw from prior of site intercepts
+year_slope = rnorm(num, 0, 0.75) # draw from prior of year slope
+year_vals = seq(min(colo_dat$year_z), max(colo_dat$year_z), len=100) 
+prior_pred = sapply(1:num, function(x) site_int[x] + year_slope[x]*year_vals) # for each random draw of intercepts and slopes, there will be one curve with 100 discritized z-transformed value of year 
+
+pp_df = data.table(data.frame(prior_pred))
+pp_df$year = year_vals
+pp_df = melt(pp_df, id.vars=c("year"))
+
+# Curves on the natural scale 
+ggplot(pp_df) + geom_line(aes(x=year, y=exp(value), group=variable)) + theme_classic() +
+	ylab("Count") + xlab("Year, z")
+
+
+# Remove exp to consider the curves on the log scale 
+ggplot(pp_df) + geom_line(aes(x=year, y=value, group=variable)) + theme_classic() +
+	ylab("Count") + xlab("Year, z")
+
+
+#ggsave("prior_pred.pdf", width=4, height=3)
+
+```
+
+# Fit model 1
+
+```{r}
+# defining stan_data to be only the needed numerical columns of the data (stan can have issues with receiving extraneous string columns)
+stan_data = colo_dat[, c("count", "year_z", "survey_effort_minutes_z", 
+						 "survey_time_id", "site_id", "wet_or_dry_id")]
+frog_mod1_fit = ulam(frog_mod1, data=stan_data, warmup=500, iter=1500, 
+					 chains=4, log_lik=TRUE, cores=4)
+
+```
+
+Look at model convergence
+
+```{r}
+#pdf("traceplot_colo.pdf", width=8, height=7)
+traceplot(frog_mod1_fit, pars=c("beta1"))
+dev.off()
+
+#pdf("trank_colo.pdf", width=8, height=7)
+trankplot(frog_mod1_fit)
+dev.off()
+
+precis(frog_mod1_fit, depth=2) #if you don't include the argument depth=2, then it will only return the parameters that don't have indexes (i.e. gamma2[1])
+```
+
+```{r}
+post = extract.samples(frog_mod1_fit)
+gamma3_natural = post$gamma3 / sd(colo_dat$year) 
+quantile(gamma3_natural, c(0.025, 0.5, 0.975))
+```
+
+
+
+
+
+Plot the posterior mean and predictive plots
+
+```{r}
+
+# Make predictions on new data
+unq_sites = unique(colo_dat$site_id)
+new_data = lapply(unq_sites, function(x) {
+		   data.frame(wet_or_dry_id=1,
+		   			  survey_time_id=2,
+		   			  survey_effort_minutes_z=0, 
+					  year_z=seq(min(stan_data$year_z), 
+					  			 max(stan_data$year_z), len=10),
+					  site_id=x)})
+new_data = do.call(rbind, new_data)
+
+# Get mean pred
+pred = link(frog_mod1_fit, data=new_data) # On natural scale by default
+new_data$med = apply(pred, 2, median)
+new_data$lower = apply(pred, 2, quantile, 0.025)
+new_data$upper = apply(pred, 2, quantile, 0.975)
+
+# Get posterior prediction pred
+# Draw from Poisson
+post_pred = array(rpois(length(as.numeric(pred)), as.numeric(pred)), dim=dim(pred))
+new_data$pred_med = apply(post_pred, 2, median)
+new_data$pred_lower = apply(post_pred, 2, quantile, 0.025)
+new_data$pred_upper = apply(post_pred, 2, quantile, 0.975)
+
+# Recode in terms of site string
+site_map = unique(colo_dat[, c("site", "site_id")])
+new_data = merge(new_data, site_map, key="site_id")
+
+# Plot
+ggplot() + geom_point(data=colo_dat, aes(x=year_z, y=count)) + 
+		   geom_line(data=new_data, aes(x=year_z, y=med, color=site)) + 
+		   geom_ribbon(data=new_data, aes(x=year_z, ymin=lower, ymax=upper, fill=site), alpha=0.5) +
+		   geom_ribbon(data=new_data, aes(x=year_z, ymin=pred_lower, ymax=pred_upper, fill=site), alpha=0.25) +
+		   facet_wrap(~site) + theme_classic() + xlab("Year") + ylab("Count") + theme_classic()
+
+#ggsave("equal_slopes_predictions.pdf", width=6, height=4)
+```
+
+# Fit a model with interactions (varying slope by site)
+
+```{r}
+
+
+frog_mod2 = alist(
+		count ~ dpois(mu),
+		log(mu) <- beta1[survey_time_id] + beta2*survey_effort_minutes_z + 
+			  gamma1[site_id] + gamma2[wet_or_dry_id] + gamma3[site_id]*year_z,
+		beta1[survey_time_id] ~ dnorm(1, 1),
+		beta2 ~ dnorm(0, 1),
+		gamma1[site_id] ~ dnorm(1, 1),
+		gamma2[wet_or_dry_id] ~ dnorm(1, 1),
+		gamma3[site_id] ~ dnorm(0, 1)
+	)
+
+stan_data = colo_dat[, c("count", "year_z", "survey_effort_minutes_z", 
+						 "survey_time_id", "site_id", "wet_or_dry_id")]
+frog_mod2_fit = ulam(frog_mod2, data=stan_data, warmup=500, iter=1500, 
+					 chains=4, log_lik=TRUE, cores=4)
+
+traceplot(frog_mod2_fit, 
+		 pars=c("gamma3[1]", "gamma3[2]", "gamma3[3]", "gamma3[4]"))
+trankplot(frog_mod2_fit, 
+		 pars=c("gamma3[1]", "gamma3[2]", "gamma3[3]", "gamma3[4]"))
+precis(frog_mod2_fit, depth=2)
+```
+
+```{r}
+post2 = extract.samples(frog_mod2_fit, depth=2)
+post2
+g1_g2 = post2$gamma3[,1] - post2$gamma3[,2]
+precis(g1_g2, c(0.025, 0.5, 0.975))
+
+
+g1_g3 = post2$gamma3[,1] - post2$gamma3[,3]
+precis(g1_g3, c(0.025, 0.5, 0.975))
+
+g1_g4 = post2$gamma3[,1] - post2$gamma3[,4]
+precis(g1_g4, c(0.025, 0.5, 0.975))
+
+compare(frog_mod1_fit, frog_mod2_fit, func=PSIS)
+        
+```
+
+
+
+Do slopes differ?
+
+```{r}
+# Option 1: Compare slope parameters
+
+post = extract.samples(frog_mod2_fit)
+slope_params = post$gamma3
+
+# Does Site 1 differ from Site 2?
+slope_diff = slope_params[, 1] - slope_params[, 2]
+quantile(slope_diff, c(0.025, 0.5, 0.975))
+#        2.5%         50%       97.5% 
+# -0.84879962 -0.46838460 -0.09782722
+
+ggplot() + geom_violin(aes(x="Diff", y=slope_diff)) 
+
+```
+
+Make predictions
+
+
+```{r}
+
+# Make predictions on new data
+unq_sites = unique(colo_dat$site_id)
+new_data = lapply(unq_sites, function(x) {
+		   data.frame(wet_or_dry_id=1,
+		   			  survey_time_id=2,
+		   			  survey_effort_minutes_z=0, 
+					  year_z=seq(min(stan_data$year_z), 
+					  			 max(stan_data$year_z), len=10),
+					  site_id=x)})
+new_data = do.call(rbind, new_data)
+
+# Get mean pred
+pred = link(frog_mod2_fit, data=new_data) # On natural scale by default
+new_data$med = apply(pred, 2, median)
+new_data$lower = apply(pred, 2, quantile, 0.025)
+new_data$upper = apply(pred, 2, quantile, 0.975)
+
+# Get posterior prediction pred
+# Draw from Poisson
+post_pred = array(rpois(length(as.numeric(pred)), as.numeric(pred)), dim=dim(pred))
+new_data$pred_med = apply(post_pred, 2, median)
+new_data$pred_lower = apply(post_pred, 2, quantile, 0.025)
+new_data$pred_upper = apply(post_pred, 2, quantile, 0.975)
+
+# Recode in terms of site string
+site_map = unique(colo_dat[, c("site", "site_id")])
+new_data = merge(new_data, site_map, key="site_id")
+
+# Plot
+ggplot() + geom_point(data=colo_dat, aes(x=year_z, y=count)) + 
+		   geom_line(data=new_data, aes(x=year_z, y=med, color=site)) + 
+		   geom_ribbon(data=new_data, aes(x=year_z, ymin=lower, ymax=upper, fill=site), alpha=0.5) +
+		   geom_ribbon(data=new_data, aes(x=year_z, ymin=pred_lower, ymax=pred_upper, fill=site), alpha=0.25) +
+		   facet_wrap(~site) + theme_classic() + xlab("Year") + ylab("Count") + theme_classic()
+
+ggsave("unequal_slopes_predictions.pdf", width=6, height=4)
+```
+
+Compare models using WAIC and PSIS
+
+```{r}
+compare(frog_mod1_fit, frog_mod2_fit, func=WAIC)
+compare(frog_mod1_fit, frog_mod2_fit, func=PSIS)
+```
+# Compare negative binomial and Poisson distributions
+
+```{r}
+nbd_dist1 = rnbinom(1000, mu=10, size=1)
+nbd_dist2 = rnbinom(1000, mu=10, size=10)
+pois_dist = rpois(1000, 10)
+
+ggplot() + geom_histogram(aes(x=nbd_dist1, fill="NBD(phi = 1)"), alpha=0.5) + 
+		   geom_histogram(aes(x=nbd_dist2, fill="NBD(phi = 10)"), alpha=0.5) + 
+		   geom_histogram(aes(x=pois_dist, fill="Poisson"), alpha=0.5) + 
+		   xlab("Number of events") +
+		   theme_classic()
+ggsave("nbd_pois_compare.pdf", width=5, height=4)
+```
+
+Negative binomial regression
+
+```{r}
+
+# Simplest NBD model
+frog_mod3 = alist(
+		count ~ dgampois(mu, phi),
+		log(mu) <- beta1[survey_time_id] + beta2*survey_effort_minutes_z + 
+			  gamma1[site_id] + gamma2[wet_or_dry_id] + gamma3*year_z,
+		beta1[survey_time_id] ~ dnorm(1, 1),
+		beta2 ~ dnorm(0, 0.75),
+		gamma1[site_id] ~ dnorm(1, 1),
+		gamma2[wet_or_dry_id] ~ dnorm(1, 1),
+		gamma3 ~ dnorm(0, 0.75),
+		phi ~ dcauchy(0, 2)
+	)
+
+frog_mod3_fit = ulam(frog_mod3, data=stan_data, warmup=500, iter=1500, 
+					 chains=4, log_lik=TRUE, cores=4)
+
+# Varying slopes NBD model
+frog_mod4 = alist(
+		count ~ dgampois(mu, phi),
+		log(mu) <- beta1[survey_time_id] + beta2*survey_effort_minutes_z + 
+			  gamma1[site_id] + gamma2[wet_or_dry_id] + gamma3[site_id]*year_z,
+		beta1[survey_time_id] ~ dnorm(1, 1),
+		beta2 ~ dnorm(0, 1),
+		gamma1[site_id] ~ dnorm(1, 1),
+		gamma2[wet_or_dry_id] ~ dnorm(1, 1),
+		gamma3[site_id] ~ dnorm(0, 1),
+		phi ~ dcauchy(0, 2)
+	)
+
+frog_mod4_fit = ulam(frog_mod4, data=stan_data, warmup=500, iter=1500, 
+					 chains=4, log_lik=TRUE, cores=4)
+
+```
+
+Look at PSIS
+
+```{r}
+compare(frog_mod3_fit, frog_mod4_fit, func=PSIS)
+```
+
+Make prediction plots
+
+```{r}
+# Make predictions on new data
+unq_sites = unique(colo_dat$site_id)
+new_data = lapply(unq_sites, function(x) {
+		   data.frame(wet_or_dry_id=1,
+		   			  survey_time_id=2,
+		   			  survey_effort_minutes_z=0, 
+					  year_z=seq(min(stan_data$year_z), 
+					  			 max(stan_data$year_z), len=10),
+					  site_id=x)})
+new_data = do.call(rbind, new_data)
+
+# Get mean pred
+pred = link(frog_mod4_fit, data=new_data) # On natural scale by default
+new_data$med = apply(pred, 2, median)
+new_data$lower = apply(pred, 2, quantile, 0.025)
+new_data$upper = apply(pred, 2, quantile, 0.975)
+
+# Get posterior prediction pred
+# Draw from Poisson
+post_pred = array(rnbinom(length(as.numeric(pred)), mu=as.numeric(pred), size=1), dim=dim(pred))
+new_data$pred_med = apply(post_pred, 2, median)
+new_data$pred_lower = apply(post_pred, 2, quantile, 0.025)
+new_data$pred_upper = apply(post_pred, 2, quantile, 0.975)
+
+# Recode in terms of site string
+site_map = unique(colo_dat[, c("site", "site_id")])
+new_data = merge(new_data, site_map, key="site_id")
+
+# Plot
+ggplot() + geom_point(data=colo_dat, aes(x=year_z, y=count)) + 
+		   geom_line(data=new_data, aes(x=year_z, y=med, color=site)) + 
+		   geom_ribbon(data=new_data, aes(x=year_z, ymin=lower, ymax=upper, fill=site), alpha=0.5) +
+		   geom_ribbon(data=new_data, aes(x=year_z, ymin=pred_lower, ymax=pred_upper, fill=site), alpha=0.25) +
+		   facet_wrap(~site) + theme_classic() + xlab("Year") + ylab("Count") + theme_classic()
+
+ggsave("nbd_predictions.pdf", width=5, height=3)
+```
+
+Check whether the slopes differ given a fit with this new distribution
+
+```{r}
+post = extract.samples(frog_mod4_fit)
+slopes = post$gamma3
+diff_slopes = slopes[, 1] - slopes[, 2]
+quantile(diff_slopes, c(0.025, 0.5, 0.975))
+diff_slopes = slopes[, 1] - slopes[, 3]
+quantile(diff_slopes, c(0.025, 0.5, 0.975))
+```
+
+# Demonstrate how to compare NBD and Poisson with `loo` package
+
+```{r}
+library(loo)
+library(cmdstanr)
+```
+
+```{r}
+pois_mod_stan = "
+data {
+
+	int N;
+	array[N] int y;
+}
+parameters {
+	real loglam;
+}
+model{
+	y ~ poisson(exp(loglam));
+} 
+generated quantities {
+
+	vector[N] log_lik;
+	for(i in 1:N){
+		log_lik[i] = poisson_lpmf(y[i] | exp(loglam));
+	}
+}
+"
+
+write_stan_file(pois_mod_stan, dir=getwd(), basename="pois_mod.stan")
+pois_mod = cmdstan_model("pois_mod.stan")
+
+```
+
+```{r}
+nbd_mod_stan = "
+data {
+
+	int N;
+	array[N] int y;
+}
+parameters {
+	real loglam;
+	real<lower=0> phi;
+}
+model{
+	phi ~ exponential(1);
+	y ~ neg_binomial_2(exp(loglam), phi);
+} 
+generated quantities {
+
+	vector[N] log_lik;
+	for(i in 1:N){
+		log_lik[i] = neg_binomial_2_lpmf(y[i] | exp(loglam), phi);
+	}
+}
+"
+
+write_stan_file(nbd_mod_stan, dir=getwd(), basename="nbd_mod.stan")
+nbd_mod = cmdstan_model("nbd_mod.stan")
+```
+
+Fit the models (Poisson and NBD). Play around with different data to see how NBD and Poisson can be distinguished with LOO-IC.
+
+```{r}
+# y = rnbinom(1000, mu=10, size=1)
+y = rpois(1000, 10)
+
+stan_data = list(N=length(y), y=y)
+pois_fit = pois_mod$sample(data=stan_data,
+                           iter_warmup=500,
+                           iter_sampling=1500,
+                           chains=4)
+
+nbd_fit = nbd_mod$sample(data=stan_data,
+                           iter_warmup=500,
+                           iter_sampling=1500,
+                           chains=4)
+
+pois_loo = pois_fit$loo()
+nbd_loo = nbd_fit$loo()
+
+loo_compare(pois_loo, nbd_loo)
+```
+
+
+
+

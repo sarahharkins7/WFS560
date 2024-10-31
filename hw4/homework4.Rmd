@@ -1,0 +1,57 @@
+---
+title: "Homework 4"
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+# Urban foxes
+
+Researchers are interested in causally understanding the factors that effect the body sizes of urban red foxes (*Vulpes vulpes*) and predicting the weight of foxes in new urban environments. Foxes move in groups on the urban landscape, and you expect that group size can help when acquiring resources on the landscape. Researchers have measured the body weights of 116 individual foxes (`weight`) as well as four other variables
+
+- `group`: The unique group ID of the foxes
+- `groupsize`: The total number of individuals in the foxes group
+- `area`: The area of the groups home range (hectares)
+- `avgfood`: The average amount of resources in the home range
+
+The following DAG is the current working hypothesis regarding how the various measured covariates causally relate to each other.
+
+```{r}
+library(dagitty)
+
+# Build your DAG
+dag <- dagitty("dag{
+area -> avgfood -> weight
+avgfood -> groupsize -> weight
+}")
+
+coordinates(dag) <- list(x=c(area=2, avgfood=1, groupsize=3,
+                             weight=2),
+                         y=c(area=2, avgfood=1, groupsize=1,
+                             weight=0))
+# Visualize DAG
+rethinking::drawdag(dag)
+```
+
+## Question 1: Checking chains
+
+Use `ulam` to fit 5 different models with the following systematic components with `weight` as the response variable
+
+- `avgfood + groupsize + area`
+- `avgfood + groupsize`
+- `groupsize + area`
+- `avgfood`
+- `area`
+
+For each model, use traceplots, trace-rank plots, $R_{hat}$, and `ess_bulk` to confirm whether the Markov chains have converged.  You don't have to comment on every plot.  Just tell me the criteria that you are using to decide whether the plots and statistics are telling you that the model converged.  If a particular plot does not look good, tell me why.  Other than generating a lot of plots, this should be a relatively short written answer (again, please don't comment on every plot/statistic).
+
+## Question 2: Model comparison
+
+Use WAIC or PSIS to compare the 5 models and answer the following questions
+
+1. Explain the differences in the WAIC or PSIS values among models based on the DAG given above.  Specifically focus on dWAIC or dPSIS, but ignore dSE for this answer.  Why are these values different based on the DAG?
+2. Which model(s) are predictively superior? Answer this question using two different quantitative criteria discussed in class and discuss whether or not they agree on which models are predictively superior. If they don't agree, why not and which criteria do you prefer?
+
+## Question 3: Drawing inference
+
+Use your causal and predictive inference to tell me a statistically justified, biological story about the factors affecting fox weight.  Include uncertainty in your story.

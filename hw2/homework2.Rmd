@@ -2,7 +2,9 @@
 title: "Homework 2"
 author: "Mark Wilber"
 date: "`r Sys.Date()`"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 # Fitting linear models to understand within-host pathogen growth
@@ -25,9 +27,51 @@ The data are given in `bd_growth_data.csv`.  The columns are
 3. `temp`: Temperature of 12 or 20 C
 4. `individual`: Individual ID of frogs
 
+
+
+
+
 ### Question 1
 
 Plot the relationship between `loadload_t` and `logload_tplus1` for 12 and 20 C.  Describe at least 2 characteristics of the relationship you are seeing.
+
+
+```{r}
+library(dplyr)
+bd_data = read.csv("bd_growth_data.csv")
+#head(bd_data)
+
+bd_12 <- bd_data %>% filter(temp == "12")
+#bd_12
+
+bd_20 <- bd_data %>% filter(temp == "20")
+#bd_20
+```
+
+```{r}
+library(ggplot2)
+library(patchwork)
+
+# plotting
+
+p1 = ggplot(bd_12)+
+     geom_point(aes(x=logload_t, y=logload_tplus1, color = as.factor(temp)))+ 
+      #geom_line(aes(x=logload_t, y=logload_tplus1, color="grey")) +
+     theme_classic()  
+#p1
+
+p2 = ggplot(bd_20)+
+     geom_point(aes(x=logload_t, y=logload_tplus1, color = as.factor(temp)))+ 
+      #geom_line(aes(x=logload_t, y=logload_tplus1, color="grey")) +
+     theme_classic()  
+#p2
+
+p1 + p2 
+
+```
+**Answer for Q1** From these plots, we can see that the relationship between logload_t and logload_tplus_1, for both 12C and 20C, roughly forms a positive linear relationship. For 12C, the data varies more at earlier time steps (i.e. the data points in the lower left are more spread out) and the points as t increases are closer together. For the 20C data, there appears to be lower variance at early and late time steps than in the "middle" time steps. 
+
+
 
 ### Question 2
 
@@ -60,6 +104,410 @@ For each model
 3. Fit each of your models using a quadratic approximation (show the code)
 4. Use posterior simulations and plots to test the validity of your fitted model (see the deer example from class as a template).  Discuss whether your data are meeting the assumptions of your model.
 
+**Answers for Q2**
+**1. The Model**
+
+For $T={12,20}$,
+
+$$
+\begin{aligned}
+log(x(t+1))_T &\sim \text{Normal}(log(\mu_T), \sigma) \\
+log(\mu_T) &= log(a_{T}) + b_{T} [log(x(t))_T - log(\bar{x}_T)] \\
+log(a_{T}) &\sim \text{Normal}(log(\bar{x}_T), 3) \\
+b_{T} &\sim \text{Normal}(0, 3) \\
+\sigma &\sim \text{Uniform}(0, 5)
+\end{aligned}
+$$
+where $\bar{x}_T$ is the mean of the log load at time $t$ for temperature $T$.
+
+
+**2. Justification of Priors**
+
+$\sigma$: I have no prior knowledge of what the variance should be so I chose an uninformative prior. (The plot of this distribution is simply a straight line so I will neglect to show it's plot.)
+$b_{T}$: This represents the slope. I chose a weakly informative prior. 
+$log(a_{T})$: This represents the y-intercept. I chose a normal distribution with mean $\log{\bar{x}_T}$ an a relatively large variance to capture a reasonable range of values. 
+$log(\mu_T)$: I chose this form because in the plots in part 1 there appears to be a roughly linear relationship between the predictor variable and the response variable. 
+$log(x(t+1))_T$: The chosen prior allows for the dependence on the predictor variable and a relatively large variance.
+
+```{r}
+
+# plot for the prior of b
+p_grid = seq(0, 5, len = 1000)
+dp = p_grid[2] - p_grid[1]
+prior_b = dunif(p_grid, 0, 5) 
+p1 = ggplot() + geom_line(aes(x=p_grid, y=prior_b*dp, linetype="Prior")) +
+     # geom_vline(aes(xintercept = 0, colour="mean")) +
+      xlab("sigma") +
+      ylab("Probability") + ggtitle("Temperature 12C and 20C") + theme_classic()
+
+p1 
+```
+
+
+```{r}
+# plot for the prior of b
+p_grid = seq(-15, 15, len = 1000)
+dp = p_grid[2] - p_grid[1]
+prior_b = dnorm(p_grid, 0, 3) 
+p1 = ggplot() + geom_line(aes(x=p_grid, y=prior_b*dp, linetype="Prior")) +
+      geom_vline(aes(xintercept = 0, colour="mean")) +
+      xlab("b (slope)") +
+      ylab("Probability") + ggtitle("Temperature 12C and 20C") + theme_classic()
+
+p1 
+```
+
+
+
+```{r}
+
+# plot for the prior of log(a_{T})
+
+### T = 12C
+
+#grid for T = 12C
+p_grid_12 = seq(min(bd_12$logload_t), max(bd_12$logload_t), len=100)
+#p_grid_12 = seq(min(bd_12$logload_tplus1), max(bd_12$logload_tplus1), len=100)
+dp_12 = p_grid_12[2] - p_grid_12[1]
+
+# Finding mean of logload_t at T=12
+mu_12 = mean(bd_12$logload_t)
+
+prior_log_a_12 = dnorm(p_grid_12, mu_12, 3) 
+p2 = ggplot() + geom_line(aes(x=p_grid_12, y=prior_log_a_12*dp_12, linetype="Prior")) +
+      #geom_vline(aes(xintercept = 0, colour="mean")) +
+      xlab("log(a_12) (intercept)") +
+      ylab("Probability") + ggtitle("Temperature 12C") + theme_classic()
+
+
+
+### T = 20C
+
+#grid for T = 20C
+p_grid_20 = seq(min(bd_20$logload_t), max(bd_20$logload_t), len=100)
+dp_20 = p_grid_20[2] - p_grid_20[1]
+
+# Finding mean of logload_t at T=12
+mu_20 = mean(bd_20$logload_t) 
+
+prior_log_a_20 = dnorm(p_grid_20, mu_20, 3) 
+p3 = ggplot() + geom_line(aes(x=p_grid_20, y=prior_log_a_20*dp_20, linetype="Prior")) +
+      #geom_vline(aes(xintercept = 0, colour="mean")) +
+      xlab("log(a_20) (intercept)") +
+      ylab("Probability") + ggtitle("Temperature 20C") + theme_classic()
+
+p2+p3
+
+
+```
+
+**3. Fitting your model**
+```{r}
+library(rethinking)
+
+  
+# de-meaning/scaling
+#bd_data$scaled_weight = (bd_data$logload_t - mean(bd_data$logload_t))
+
+bd_12$scaled_weight = (bd_12$logload_t - mean(bd_12$logload_t))
+bd_20$scaled_weight = (bd_20$logload_t - mean(bd_20$logload_t))
+
+# fitting the model 
+fit_mod_12 = quap(
+			 alist(
+			 	logload_tplus1 ~ dnorm(mu, sigma),
+			 	mu <- prior_log_a_12 + prior_b*scaled_weight,
+			 	#prior_log_a_12 ~ dnorm(int_12 , 3),
+			 	prior_log_a_12 ~ dnorm(mu_12 , 3),
+			 	prior_b ~ dnorm(0, 3),
+			 	sigma ~ dunif(0, 5)
+			 ), data = bd_12)
+precis(fit_mod_12, prob=0.95)
+
+
+# fitting the model 
+fit_mod_20 = quap(
+			 alist(
+			 	logload_tplus1 ~ dnorm(mu, sigma),
+			 	mu <- prior_log_a_20 + prior_b*scaled_weight,
+			 	#prior_log_a_20 ~ dnorm(int_20 , 3),
+			 	prior_log_a_20 ~ dnorm(mu_20 , 3),
+			 	prior_b ~ dnorm(0, 3),
+			 	sigma ~ dunif(0, 5)
+			 ), data = bd_20)
+
+precis(fit_mod_20, prob=0.95)
+# Extract the posterior
+post_12 = extract.samples(fit_mod_12, n=10000)
+post_20 = extract.samples(fit_mod_20, n=10000)
+#post_20
+
+# hypothesis testing 
+diff_log_a = post_12[,1]-post_20[,1]
+precis(diff_log_a, prob=0.95)
+diff_b = post_12[,2]-post_20[,2]
+precis(diff_b, prob=0.95)
+
+# Compare prior and posterior
+#n = 10000
+
+#ints_12 = rnorm(n, mu_12 , 3) # log alpha_T / intercepts 
+#ints_20 = rnorm(n, mu_20 , 3) # log alpha_T / intercepts 
+#slopes = rnorm(n, 0, 3) # b / slopes
+
+# Compare prior and posterior
+# p1 = ggplot() + geom_density(aes(ints_12, color='prior')) +
+# 				geom_density(aes(post_12[, 1], color='posterior')) + 
+# 				scale_color_manual(values=c("blue", 'black')) +
+# 				xlab("log(a_12) (intercept)") + 
+# 				ylab("Density") +
+#         ggtitle("Temperature 12C") +
+# 				theme_classic()
+# 
+# p2 = ggplot() + geom_density(aes(ints_20, color='prior')) +
+# 				geom_density(aes(post_20[, 1], color='posterior')) + 
+# 				scale_color_manual(values=c("blue", 'black')) +
+# 				xlab("log(a_20) (intercept)") + 
+# 				ylab("Density") +
+#         ggtitle("Temperature 20C") +
+# 				theme_classic()
+# 
+# 
+# p3 = ggplot() + geom_density(aes(slopes, color="prior")) +
+# 				geom_density(aes(post_12[, 2], color="posterior")) +
+# 				scale_color_manual(values=c("blue", 'black')) +
+# 				xlab("b (slope)") + 
+# 				ylab("Density") +
+# 				theme_classic()
+# 
+# p1+p2+p3
+
+```
+
+
+```{r}
+# Just posterior
+p1 = ggplot() + 
+				geom_density(aes(post_12[, 1], color='posterior')) + 
+				scale_color_manual(values=c("blue", 'black')) +
+				xlab("log(a_12) (intercept)") + 
+				ylab("Density") +
+				theme_classic()
+p2 = ggplot() + 
+				geom_density(aes(post_20[, 1], color='posterior')) + 
+				scale_color_manual(values=c("blue", 'black')) +
+				xlab("log(a_20) (intercept)") + 
+				ylab("Density") +
+				theme_classic()
+
+p3 = ggplot() +
+				geom_density(aes(post_12[, 2], color="posterior")) +
+				scale_color_manual(values=c("blue", 'black')) +
+				xlab("b(slope) T = 12C") + 
+				ylab("Density") +
+				theme_classic()
+
+p4 = ggplot() +
+				geom_density(aes(post_20[, 2], color="posterior")) +
+				scale_color_manual(values=c("blue", 'black')) +
+				xlab("b(slope) T = 20C") + 
+				ylab("Density") +
+				theme_classic()
+p1+p2+p3+p4
+```
+```{r}
+# posterior predictions 
+library(data.table)
+vals = seq(min(bd_12$scaled_weight, bd_20$scaled_weight), max(bd_12$scaled_weight, bd_20$scaled_weight), len=50)
+
+# For T = 12
+lines_12= sapply(vals, function(x) post_12[1:100, 1] + x*post_12[1:100, 2])
+lines_12_dt = data.table(data.frame(t(lines_12)))
+lines_12_dt$scaled_weight = vals
+lines_12_melt = melt(lines_12_dt, id.vars="scaled_weight")
+
+lines_12_plt = ggplot(lines_12_melt) + geom_line(aes(x=scaled_weight, y=value, group=variable), alpha=0.2) +
+						  theme_classic() + xlab("logload_t") +
+						  ylab("logload_tplus_1") +
+              ggtitle("Temperature 12C")
+
+
+# For T = 20
+lines_20= sapply(vals, function(x) post_20[1:100, 1] + x*post_20[1:100, 2])
+lines_20_dt = data.table(data.frame(t(lines_20)))
+lines_20_dt$scaled_weight = vals
+lines_20_melt = melt(lines_20_dt, id.vars="scaled_weight")
+
+lines_20_plt = ggplot(lines_20_melt) + geom_line(aes(x=scaled_weight, y=value, group=variable), alpha=0.2) +
+						  theme_classic() + xlab("logload_t") +
+						  ylab("logload_tplus_1")+
+              ggtitle("Temperature 20C")
+
+lines_12_plt + lines_20_plt
+```
+
+
+
+**4. Viability of Model**
+
+```{r}
+# Generate mean predictions
+
+# Step 1: Draw beta0 and beta1
+post_12 = extract.samples(fit_mod_12, n=10000)
+prior_log_a_12 = post_12[, 1]
+b = post_12[, 2]
+#sigma = post_12[, 3]
+
+# Step 2-4: For a doe body weight, calculate mean
+pllt12 = seq(min(bd_12$logload_t), max(bd_12$logload_t), len=50)
+pllt12_scaled = pllt12 - mean(bd_12$logload_t)
+llt12_mean = sapply(pllt12_scaled, function(x) prior_log_a_12 + x*b)
+
+# Step 5. Summarize
+median_llt12 = apply(llt12_mean, 2, median)
+lowerupper_pred = apply(llt12_mean, 2, function(x) quantile(x, c(0.025, 0.975)))
+llt12_df = data.frame(med=median_llt12, 
+					 lower=lowerupper_pred[1, ], 
+					 upper=lowerupper_pred[2, ],
+					 logload_t=pllt12)
+# Step 6. Visualize
+p1 = ggplot() + geom_point(data=bd_12, aes(x=logload_t, y=logload_tplus1, color="Observed")) +
+		   geom_line(data=llt12_df, aes(x=pllt12, y=med, color="Mean prediction")) +
+		   geom_ribbon(data=llt12_df, aes(x=pllt12, ymin=lower, ymax=upper, fill="95% CI\naround mean"),
+		   								 alpha=0.2) +
+		   scale_color_manual(values=c("blue", 'black')) +
+		   scale_fill_manual(values=c('blue')) +
+		   theme_classic() +
+		   xlab("logload_t") +
+       ylab("logload_tplus1") +
+       ggtitle("Temperature 12 C")
+
+
+# p1 = ggplot() + geom_point(data=bd_12, aes(x=scaled_weight, y=logload_tplus1, color="Observed")) +
+# 		   geom_line(data=llt12_df, aes(x=pllt12_scaled, y=med, color="Mean prediction")) + 
+# 		   geom_ribbon(data=llt12_df, aes(x=pllt12_scaled, ymin=lower, ymax=upper, fill="95% CI\naround mean"), 
+# 		   								 alpha=0.2) +
+# 		   scale_color_manual(values=c("blue", 'black')) +
+# 		   scale_fill_manual(values=c('blue')) +
+# 		   theme_classic() +
+# 		   xlab("de-meaned logload_t") + 
+#        ylab("logload_tplus1") +
+#        ggtitle("Temperature 12 C")
+
+
+#### Repeating the same process for temperature 20C
+post_20 = extract.samples(fit_mod_20, n=10000)
+prior_log_a_20 = post_20[, 1]
+b = post_20[, 2]
+#sigma = post_20[, 3]
+
+# Step 2-4: For a doe body weight, calculate mean
+pllt20 = seq(min(bd_20$logload_t), max(bd_20$logload_t), len=50)
+pllt20_scaled = pllt20 - mean(bd_20$logload_t)
+llt20_mean = sapply(pllt20_scaled, function(x) prior_log_a_20 + x*b)
+
+# Step 5. Summarize
+median_llt20 = apply(llt20_mean, 2, median)
+lowerupper_pred = apply(llt20_mean, 2, function(x) quantile(x, c(0.025, 0.975)))
+llt20_df = data.frame(med=median_llt20, 
+					 lower=lowerupper_pred[1, ], 
+					 upper=lowerupper_pred[2, ],
+					 logload_t=pllt12)
+#llt20_df
+
+# Step 6. Visualize
+p2 = ggplot() + geom_point(data=bd_20, aes(x=logload_t, y=logload_tplus1, color="Observed")) +
+		   geom_line(data=llt20_df, aes(x=pllt20, y=med, color="Mean prediction")) +
+		   geom_ribbon(data=llt20_df, aes(x=pllt20, ymin=lower, ymax=upper, fill="95% CI\naround mean"),
+		   								 alpha=0.2) +
+		   scale_color_manual(values=c("blue", 'black')) +
+		   scale_fill_manual(values=c('blue')) +
+		   theme_classic() +
+		   xlab("logload_t") +
+       ylab("logload_tplus1") +
+       ggtitle("Temperature 20 C")
+
+# p2 = ggplot() + geom_point(data=bd_20, aes(x=scaled_weight, y=logload_tplus1, color="Observed")) +
+# 		   geom_line(data=llt20_df, aes(x=pllt20_scaled, y=med, color="Mean prediction")) + 
+# 		   geom_ribbon(data=llt20_df, aes(x=pllt20_scaled, ymin=lower, ymax=upper, fill="95% CI\naround mean"), 
+# 		   								 alpha=0.2) +
+# 		   scale_color_manual(values=c("blue", 'black')) +
+# 		   scale_fill_manual(values=c('blue')) +
+# 		   theme_classic() +
+# 		   xlab("de-meaned logload_t") + 
+#        ylab("logload_tplus1") +
+#        ggtitle("Temperature 20 C")
+
+p1 + p2
+
+```
+
+```{r}
+# Step 1: Draw beta0 and beta1
+n = 10000
+post_12 = extract.samples(fit_mod_12, n=10000)
+prior_log_a_12 = post_12[, 1]
+b = post_12[, 2]
+sigma = post_12[, 3]
+
+# Step 2-4: For a doe body weight, calculate mean and draw from normal
+llt12_distribution = sapply(pllt12_scaled, function(x) rnorm(n, prior_log_a_12 + x*b, sigma)) # drawing random logload_tplus1
+
+# Step 5. Summarize
+median_llt12_dist = apply(llt12_distribution, 2, median)
+lowerupper_llt12_dist = apply(llt12_distribution, 2, function(x) quantile(x, c(0.025, 0.975)))
+llt12_dist_df = data.frame(med=median_llt12_dist, 
+					 lower=lowerupper_llt12_dist[1, ], 
+					 upper=lowerupper_llt12_dist[2, ],
+					 logload_t=pllt12)
+
+p1 = ggplot() + geom_point(data=bd_12, aes(x=logload_t, y=logload_tplus1, color="Observed")) +
+		   geom_line(data=llt20_df, aes(x=pllt12, y=med, color="Mean prediction")) + 
+		   geom_ribbon(data=llt20_df, aes(x=pllt12, ymin=lower, ymax=upper, fill="95% CI\naround mean"), 
+		   								 alpha=0.2) +
+		   geom_ribbon(data=llt12_dist_df, aes(x=pllt12, ymin=lower, ymax=upper, fill="95% CI\naround prediction"), 
+		   								 alpha=0.2) +
+		   scale_color_manual(values=c("blue", 'black')) +
+		   scale_fill_manual(values=c('blue', 'red')) +
+		   theme_classic() +
+		   xlab("logload_t") + ylab("logload_tplus1") + ggtitle(" Temperature = 12C")
+
+# Repeating these steps for T = 20C 
+# Step 1: Draw beta0 and beta1
+post_20 = extract.samples(fit_mod_20, n=10000)
+prior_log_a_20 = post_20[, 1]
+b = post_20[, 2]
+sigma = post_20[, 3]
+
+# Step 2-4: For a doe body weight, calculate mean and draw from normal
+llt20_distribution = sapply(pllt20_scaled, function(x) rnorm(n, prior_log_a_20 + x*b, sigma)) # drawing random logload_tplus1
+
+# Step 5. Summarize
+median_llt20_dist = apply(llt20_distribution, 2, median)
+lowerupper_llt20_dist = apply(llt20_distribution, 2, function(x) quantile(x, c(0.025, 0.975)))
+llt20_dist_df = data.frame(med=median_llt20_dist, 
+					 lower=lowerupper_llt20_dist[1, ], 
+					 upper=lowerupper_llt20_dist[2, ],
+					 logload_t=pllt20)
+
+p2 = ggplot() + geom_point(data=bd_20, aes(x=logload_t, y=logload_tplus1, color="Observed")) +
+		   geom_line(data=llt20_df, aes(x=pllt20, y=med, color="Mean prediction")) + 
+		   geom_ribbon(data=llt20_df, aes(x=pllt20, ymin=lower, ymax=upper, fill="95% CI\naround mean"), 
+		   								 alpha=0.2) +
+		   geom_ribbon(data=llt20_dist_df, aes(x=pllt20, ymin=lower, ymax=upper, fill="95% CI\naround prediction"), 
+		   								 alpha=0.2) +
+		   scale_color_manual(values=c("blue", 'black')) +
+		   scale_fill_manual(values=c('blue', 'red')) +
+		   theme_classic() +
+		   xlab("logload_t") + ylab("logload_tplus1") + ggtitle(" Temperature = 20C")
+p1+p2
+p1
+```
+
+For T = 12C, it appears that the modeling assumption that there is heteroscadicity since the observed points vary greatly at lower values of logload_t. 
+
+
 **Making inference on the models**
 
 1. Using your fitted model, draw conclusions about three hypothesis relating to differences in Bd growth and load dynamics on frogs at different temperatures.
@@ -68,6 +516,23 @@ For each model
   c. $\theta_{12} = \theta_{20}$
 
 When drawing your conclusions, use plots of posterior distributions and credible intervals to support your answers.
+
+a. Based on the computation "precis(diff_log_a, prob=0.95)", we can reject $log(a_{12}) = log(a_{20})$. 
+b. Based on the computation "precis(diff_b, prob=0.95)" we can conclude that it is plausible for $b_{12} = b_{20}$. 
+
+```{r}
+theta_12 = post_12[,2]/(1-post_12[,1])
+  
+theta_20 = post_20[,2]/(1-post_20[,1])
+  
+diff_theta = theta_12 - theta_20
+
+precis(diff_theta, prob=0.95)
+```
+
+c. From the above computation, the values for diff_theta do not overlap with 0, thus we can conclude that $\theta_{12} \neq \theta_{20}$. 
+
+
 
 ## Question 3
 
@@ -119,6 +584,140 @@ where we have one additional parameter to estimate, $\alpha_1$. I am purposefull
 1. Fully write-out the model with non-constant variance for Bd load dynamics on frogs at 12 C (you don't need to do it at 20 C). 
 2. Clearly specify what prior distributions you are choosing for your new parameters and why.
 3. Fit the model using `quap` and answer the question: Does our model support the hypothesis that variance in Bd load at time $t + 1$ is decreasing with increasing Bd load at time $t$?  Justify your answer with a plot, point estimate, and credible interval.
+
+$$
+\begin{aligned}
+log(x(t+1))_T &\sim \text{Normal}(log(\mu_T), \sigma) \\
+log(\mu_T) &= log(a_{T}) + b_{T} [log(x(t))_T - log(\bar{x}_T)] \\
+log(a_{T}) &\sim \text{Normal}(log(\bar{x}_T), 3) \\
+b_{T} &\sim \text{Normal}(0, 3) \\
+\sigma_i &= s e^{\alpha_1 x_i} \\
+s &\sim \text{Exponential(1)} \\
+\alpha_1 &\sim \text{Normal}(0, 3)
+\end{aligned}
+$$
+
+
+Reasoning for priors:
+
+$s \sim \text{Exponential}(1)$: This was chosen because the support of the Beta distribution is [0,1], which enforces the face that we require $\sigma_i$ to be strictly positive as it becomes the variance for the likelihood. Note: the probability of s is 0 is measure zero. Having $s \in [0,1]$ will allow us to scale the intensity of the exponential factor in the term $\sigma_i$. 
+$\alpha_1 \sim \text{Normal(0,3)}$: This will allow the exponent to be either positive or negative, which does not change the overall sign of $sigma_i$. 
+The other priors are left the same from question 2. 
+
+
+```{r}
+# fitting the model with 'quap' 
+#library(invgamma)
+fit_mod_3 = quap(
+			 alist(
+			 	logload_tplus1 ~ dnorm(mu, sigma),
+			 	mu <- log_a + b*(logload_t - mean(logload_t)),
+			 	log_a ~ dnorm(mu_12, 3),
+			 	b ~ dnorm(0, 3),
+			 	sigma <- s*exp(alpha * (logload_t - mean(logload_t))), 
+			 	alpha ~ dnorm(0, 3),
+			 	s ~ dexp(0.5)
+			 ), data = bd_12)
+precis(fit_mod_3, prob=0.95)
+
+
+# Plots of the fitted posteriors 
+
+post_Q3 = extract.samples(fit_mod_3, n=10000)
+post_Q3
+
+p1 = ggplot() + 
+				geom_density(aes(post_Q3[, 1], color='posterior')) + 
+				scale_color_manual(values=c("blue", 'black')) +
+				xlab("log(a_12) (intercept)") + 
+				ylab("Density") +
+				theme_classic()
+p2 = ggplot() + 
+				geom_density(aes(post_Q3[, 2], color='posterior')) + 
+				scale_color_manual(values=c("blue", 'black')) +
+				xlab("b (slope)") + 
+				ylab("Density") +
+				theme_classic()
+
+p3 = ggplot() +
+				geom_density(aes(post_Q3[, 3], color="posterior")) +
+				scale_color_manual(values=c("blue", 'black')) +
+				xlab("alpha") + 
+				ylab("Density") +
+				theme_classic()
+
+p4 = ggplot() +
+				geom_density(aes(post_Q3[, 4], color="posterior")) +
+				scale_color_manual(values=c("blue", 'black')) +
+				xlab("s") + 
+				ylab("Density") +
+				theme_classic()
+p1+p2+p3+p4
+
+```
+
+
+
+```{r}
+# plot
+# Generate mean predictions
+
+# Step 1: Draw beta0 and beta1
+post_Q3 = extract.samples(fit_mod_3, n=10000)
+log_a = post_Q3[, 1]
+b = post_Q3[, 2]
+alpha = post_Q3[,3]
+s = post_Q3[, 4]
+
+
+# Step 2-4: For a logload_t, calculate mean
+ticks = seq(min(bd_12$logload_t), max(bd_12$logload_t), len=100)
+plogload_t_Q3_scaled = ticks - mean(bd_12$logload_t)
+
+logload_t_Q3_mean = link(fit_mod_3, data=list(logload_t=ticks), n=10000)
+
+median_logload_t_Q3 = apply(logload_t_Q3_mean$mu, 2, median)
+#head(median_logload_t_Q3)
+
+lowerupper_pred = apply(logload_t_Q3_mean$mu, 2, function(x) quantile(x, c(0.025, 0.975)))
+
+logload_t_Q3_df = data.frame(med=median_logload_t_Q3, 
+					 lower=lowerupper_pred[1, ], 
+					 upper=lowerupper_pred[2, ],
+					 logload_t=ticks)
+
+logload_t_Q3_distribution = sim(fit_mod_3, data = list(logload_t=ticks), n=10000)
+ median_logload_t_Q3_dist = apply(logload_t_Q3_distribution, 2, median)
+
+ lowerupper_logload_t_Q3_dist = apply(logload_t_Q3_distribution, 2, function(x) quantile(x, c(0.025, 0.975)))
+ logload_t_Q3_dist_df = data.frame(med=median_logload_t_Q3_dist,
+ 					 lower=lowerupper_logload_t_Q3_dist[1, ],
+ 					 upper=lowerupper_logload_t_Q3_dist[2, ],
+ 					 logload_t=ticks)
+ ggplot() + geom_point(data=bd_12, aes(x=logload_t, y=logload_tplus1, color="Observed")) +
+ 		   geom_line(data=logload_t_Q3_df, aes(x=logload_t, y=med, color="Mean prediction")) +
+ 		   geom_ribbon(data=logload_t_Q3_df, aes(x=logload_t, ymin=lower, ymax=upper, fill="95% CI\naround mean"), alpha=0.2) +
+ 		   geom_ribbon(data=logload_t_Q3_dist_df, aes(x=logload_t, ymin=lower, ymax=upper, fill="95% CI\naround prediction"), alpha=0.2) +
+
+
+        scale_color_manual(values=c("blue", 'black')) +
+ 		   scale_fill_manual(values=c('blue', 'red')) +
+ 		   theme_classic() +
+ 		   xlab("logload_t") +
+        ylab("logload_tplus1") +
+        ggtitle("Temperature 12 C with changing variance")
+```
+
+
+```{r}
+precis(fit_mod_3 , prob = 0.95)
+```
+
+
+Does our model support the hypothesis that variance in Bd load at time $t + 1$ is decreasing with increasing Bd load at time $t$?  
+Justify your answer with a plot, point estimate, and credible interval.
+
+This model better accounts for the changing variance, as seen by the pink ribbon (95% confidence interval of predictions) widening where there is more variance in the observed data. This new models also maintains the linearity assumption. From the above table generated with "precis", the parameter alpha is negative since zero is contained in the 95% confidence interval. Based on the form of the variance of the response variable, there will be exponential decay in the variance as the values of logload_t increase. 
 
 ### Bonus question: Propogating uncertainty to model simulation
 

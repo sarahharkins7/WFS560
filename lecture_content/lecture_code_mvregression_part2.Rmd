@@ -1,0 +1,688 @@
+---
+title: 'Lecture code: Bayesian multivariate regression, Part II'
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Load in the dragonfly data
+
+```{r}
+library(ggplot2)
+
+dfly_data = read.csv("dragonfly.csv")
+dfly_data
+ggplot(dfly_data, aes(x=bodylength, 
+					  y=wingspan, 
+					  color=population)) + 
+					geom_point() + geom_line() +
+					theme_classic() + xlab("Body length (mm)") +
+					ylab("Wingspan (mm)")
+
+#ggsave("dragonfly_plot.pdf", width=4, height=3)
+```
+
+Make a DAG
+
+```{r}
+library(dagitty)
+
+dag <- dagitty("dag{
+Population -> Wingspan
+Bodysize -> Wingspan
+}")
+
+coordinates(dag) <- list(x=c(Population=0, 
+							 Wingspan=2,
+							 Bodysize=0),
+                         y=c(Population=0,
+                         	 Wingspan=-1,
+                         	 Bodysize=-2))
+
+
+pdf("dragon_dag.pdf", width=4, height=3)
+rethinking::drawdag(dag)
+dev.off()
+
+
+```
+
+```{r}
+library(rethinking)
+library(ggplot2)
+
+# Simulate data to explore the effects of population on body size estimates
+
+# set.seed(12)
+
+# Strength of the effects
+popeffects = seq(0, 1, len=10)
+all_ests = list()
+
+count = 1
+for(peffect in popeffects){
+
+	set.seed(10)
+	n = 100
+	population = sample(c(1, 2, 3), size=n, replace=TRUE)
+	X = model.matrix(formula(~as.factor(population) - 1))
+	pop_effects = c(0, 0, 0) # No effect of population on bodysize
+	bodysize = rnorm(n, mean=X %*% pop_effects, sd=1)
+	wingspan = rnorm(n, mean=peffect*2*X[, 1] - peffect*2*X[, 2] + peffect*0*X[, 3] + 
+					         bodysize, sd=0.3)
+
+	p1 = ggplot() + geom_point(aes(x=bodysize, y=wingspan, color=as.factor(population))) +
+					theme_classic() + xlab("Body size, z") + ylab("Wingspan, z") +
+	        guides(color=guide_legend(title="Pop"))
+  
+	# Just save no effect and strong effect
+	if(peffect %in% c(0, 1)){
+		ggsave(paste0("example_pop_effect", peffect, ".pdf"), width=4, height=3)
+	}
+
+	# Build dataframe to fit models
+	tdat = data.frame(wingspan=wingspan, bodysize=bodysize)
+	fit = quap(
+			alist(
+			   	wingspan ~ dnorm(mu, sigma),
+			   	mu <- beta0 + beta1*(bodysize - mean(bodysize)),
+			   	beta0 ~ dnorm(0, 1),
+			   	beta1 ~ dnorm(0, 5),
+			   	sigma ~ dexp(1)
+			   	), data=tdat)
+
+	ests = precis(fit, prob=0.95)
+	td = data.frame(peffect=peffect, mean=ests$mean[2], 
+					lower=ests$`2.5%`[2], upper=ests$`97.5%`[2])
+	all_ests[[count]] = td
+	count = count + 1
+}
+
+ # Plot the coefficient estimates
+all_ests_df = do.call(rbind, all_ests)
+
+ggplot(all_ests_df) + geom_point(aes(x=peffect, y=mean)) +
+					  geom_errorbar(aes(x=peffect, ymin=lower, ymax=upper), width=0.05) +
+					  geom_hline(aes(yintercept=1, color="True value"), linetype="dashed") +
+					  scale_color_manual(values=c("black")) +
+					  xlab("Effect of population") + ylab("Body size slope") +
+					  theme_classic()
+ggsave("slope_ests.pdf", width=6, height=3)
+
+
+```
+
+## Fit the model with discrete covariates
+
+### Set-to-zero constraint
+
+```{r}
+head(dfly_data)
+
+# Get design matrix
+X = model.matrix(formula(~population), data=dfly_data)
+X
+
+df1 = data.frame(X)
+colnames(df1) = c("int", "cat", "nav")
+df1$wingspan = dfly_data$wingspan
+mean(df1$wingspan)
+
+# Fit the Bayesian model
+fit1 = quap(
+		alist(
+			wingspan ~ dnorm(mu, sigma),
+			mu <- beta0*int + beta1*cat + beta2*nav,
+			beta0 ~ dnorm(11.85, 5),
+			c(beta1, beta2) ~ dnorm(0, 5),
+			sigma ~ dexp(1)), data=df1)
+precis(fit1, prob=0.95)
+
+# Extract the mean at Navarra
+post = extract.samples(fit1, n=10000)
+navarra = post[,1] + post[, 3]
+quantile(navarra, c(0.025, 0.5, 0.975))
+
+# Compare with a frequentist approach
+summary(lm(wingspan ~ population, data=dfly_data))
+```
+
+### Means model
+
+```{r}
+X = model.matrix(formula(~population - 1), data=dfly_data)
+
+df2 = data.frame(X)
+colnames(df2) = c("arg", "cat", "nav")
+df2$wingspan = dfly_data$wingspan
+mean(df2$wingspan)
+
+fit2 = quap(
+		alist(
+			wingspan ~ dnorm(mu, sigma),
+			mu <- beta0*arg + beta1*cat + beta2*nav,
+			c(beta0, beta1, beta2) ~ dnorm(11.85, 3),
+			sigma ~ dexp(1)), data=df2)
+precis(fit2, prob=0.95)
+
+summary(lm(wingspan ~ population - 1, data=dfly_data))
+```
+
+### Fit the means model with population indices
+
+```{r}
+
+df3 = dfly_data[, c("wingspan", "population")]
+
+# A helpful rethinking function to convert a factor into integer levels
+df3$population2 = coerce_index(as.factor(df3$population))
+
+fit3 = quap(
+		alist(
+			wingspan ~ dnorm(mu, sigma),
+			mu <- beta[population2],
+			beta[population2] ~ dnorm(11.85, 3),
+			sigma ~ dexp(1)), data=df3)
+precis(fit3, prob=0.95, depth=2)
+
+```
+
+Compare the posterior distributions to ensure we are getting the same answers
+with the different ways of fitting the models
+
+```{r}
+# Compare the posterior distributions to ensure we are getting the same answers
+post1 = extract.samples(fit1, n=10000)
+post2 = extract.samples(fit2, n=10000)
+post3 = extract.samples(fit3, n=10000, "beta")
+
+
+cat1 = post1$beta0 + post1$beta1
+cat2 = post2$beta1
+cat3 = post3$beta[, 2]
+
+# Plot Catalonia posteriors
+ggplot() + geom_density(aes(x=cat1, color="Set-to-zero")) + 
+		   geom_density(aes(x=cat2, color="Means model 1")) + 
+		   geom_density(aes(x=cat3, color="Means model 2")) +
+		   theme_classic() + xlab("Posterior wingspan, Catalonia")
+
+ggsave("compare_posterior_cat.pdf", width=5, height=3)
+
+# Plot aragon posteriors
+
+arg1 = post1$beta0
+arg2 = post2$beta0
+arg3 = post3$beta[, 1]
+
+ggplot() + geom_density(aes(x=arg1, color="Set-to-zero")) + 
+		   geom_density(aes(x=arg2, color="Means model 1")) + 
+		   geom_density(aes(x=arg3, color="Means model 2")) +
+		   theme_classic() + xlab("Posterior wingspan, Aragon")
+
+ggsave("compare_posterior_arg.pdf", width=5, height=3)
+
+# Plot Navarro posteriors
+
+nav1 = post1$beta0 + post1$beta2
+nav2 = post2$beta2
+nav3 = post3$beta[, 3]
+
+ggplot() + geom_density(aes(x=nav1, color="Set-to-zero")) + 
+		   geom_density(aes(x=nav2, color="Means model 1")) + 
+		   geom_density(aes(x=nav3, color="Means model 2")) +
+		   theme_classic() + xlab("Posterior wingspan, Catalonia")
+
+ggsave("compare_posterior_nav.pdf", width=5, height=3)
+
+```
+
+Fit the model.  Explore prior predictive simulations first
+
+```{r}
+library(data.table)
+
+dfly_data$population2 = coerce_index(as.factor(dfly_data$population))
+dfly_data$bodylength_z = scale(dfly_data$bodylength)
+
+# Prior simulations
+n=100
+bvals = seq(min(dfly_data$bodylength_z),
+			      max(dfly_data$bodylength_z), len=n)
+
+ints = rnorm(n, 11.85, 3)
+slopes = rnorm(n, 0, 2)
+preds = sapply(1:n, function(i) ints[i] + slopes[i]*bvals)
+
+pred_dt = as.data.table(preds)
+pred_dt$bvals = bvals
+pred_dt_melt = melt(pred_dt, id.vars=c("bvals"))
+ggplot(pred_dt_melt) + geom_line(aes(x=bvals, y=value, group=variable)) + theme_classic() + 
+	xlab("Body length z") + ylab("Wingspan (mm)")
+ggsave("prior_simulation.pdf", width=4, height=3)
+```
+
+```{r}
+library(patchwork)
+
+# Fit with means model
+dfly_data$population2 = coerce_index(as.factor(dfly_data$population))
+dfly_data$bodylength_z = scale(dfly_data$bodylength)
+
+# Fit the model
+mod1 = quap(
+		alist(
+			wingspan ~ dnorm(mu, sigma),
+			mu <- alpha[population2] + beta1*bodylength_z,
+			alpha[population2] ~ dnorm(11.85, 3),
+			beta1 ~ dnorm(0, 2),
+			sigma ~ dexp(1 / 2)),
+		data=dfly_data)
+
+# Residuals
+# Median residuals
+pred = link(mod1)
+mean_pred = colMeans(pred)
+resid = dfly_data$wingspan - mean_pred
+
+# QQplot to check normality
+df = data.frame(resid=resid, x=dfly_data$bodylength_z)
+p = ggplot(df, aes(sample = resid))
+pq = p + stat_qq() + stat_qq_line() + theme_classic()
+
+# Residual plot to check equal variance
+pr = ggplot(df, aes(x=x, y=resid)) + geom_point() + geom_hline(aes(yintercept=0), linetype="dashed") + xlab("bodylength_z") + ylab("residual") + theme_classic()
+pq + pr
+ggsave("residual_plot_dragon.pdf", width=6, height=3)
+
+
+# Plot the mean predictions
+
+# Make new data
+bvals = seq(min(dfly_data$bodylength_z),
+			max(dfly_data$bodylength_z), len=50)
+newdata = expand.grid(bvals, c(1, 2, 3))
+colnames(newdata) = c("bodylength_z", "population2")
+
+# Simulate predictions from model
+pred2 = data.frame(t(link(mod1, newdata, n=50)))
+full_dat = data.table(cbind(newdata, pred2))
+full_dat_melt = melt(full_dat, id.vars=c("bodylength_z", "population2"))
+full_dat_melt$group = paste0(full_dat_melt$population2,
+							 full_dat_melt$variable)
+
+# Plot the observed vs predicted
+ggplot(full_dat_melt) + 
+	geom_line(aes(x=bodylength_z, y=value, group=group, color=as.factor(population2)), alpha=0.25) +
+	geom_point(data=dfly_data, aes(x=bodylength_z, y=wingspan, color=as.factor(population2)), size=3) +
+	geom_line(data=dfly_data, aes(x=bodylength_z, y=wingspan, color=as.factor(population2))) + 
+	xlab("Body length z") + 
+	ylab("Wingspan") + 
+	labs(color=element_text("Population")) +
+	theme_classic()
+ggsave("obs_pred_dragonfly.pdf", width=5.5, height=3)
+
+
+```
+
+```{r}
+# Plot coefficient estimates
+post = extract.samples(mod1, n=10000)
+
+# Is there a positive effect of body size?
+quantile(post$beta1, c(0.025, 0.975))
+mean(post$beta1 / sd(dfly_data$bodylength))
+
+# Is Aragon different then Catalonia?
+quantile(post$alpha[, 1] - post$alpha[, 2], c(0.025, 0.975))
+
+
+```
+
+## Multicollinearity
+
+Understanding multicollinearity through simulation
+
+```{r}
+library(rethinking)
+
+data(milk)
+d = milk[, c("kcal.per.g", "perc.fat", "perc.lactose")]
+head(d)
+dim(d)
+
+pdf("multicollinearity.pdf", width=5, height=4)
+pairs(d)
+dev.off()
+
+cor(d)
+
+```
+
+Fit three different models to examine the effects of collinearity
+
+```{r}
+
+d_scale = data.frame(scale(d))
+mod_lact = quap(
+			alist(
+				kcal.per.g ~ dnorm(mu, sigma),
+				mu <- beta0 + beta1*perc.lactose,
+				beta0 ~ dnorm(0, 3),
+				beta1 ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=d_scale)
+precis(mod_lact, prob=0.95)
+
+mod_fat = quap(
+			alist(
+				kcal.per.g ~ dnorm(mu, sigma),
+				mu <- beta0 + beta1*perc.fat,
+				beta0 ~ dnorm(0, 3),
+				beta1 ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=d_scale)
+precis(mod_fat, prob=0.95)
+
+
+mod_total = quap(
+			alist(
+				kcal.per.g ~ dnorm(mu, sigma),
+				mu <- beta0 + beta1*perc.fat + beta2*perc.lactose,
+				beta0 ~ dnorm(0, 3),
+				c(beta1, beta2) ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=d_scale)
+precis(mod_total, prob=0.95)
+
+```
+
+
+```{r}
+
+# DAG 1
+n = 100
+tsd = 1 # Decrease to increase correlation
+ff = rnorm(n)
+fat = rnorm(n, -ff, sd=tsd)
+lact = rnorm(n, ff, sd=tsd)
+kilo = rnorm(n, fat - lact)
+
+df = data.frame(k=kilo, f=fat, l=lact)
+
+pairs(df)
+cor(df)
+
+sim_mod = quap(
+			alist(
+				k ~ dnorm(mu, sigma),
+				mu <- beta0 + betaf*f + betal*l,
+				beta0 ~ dnorm(0, 3),
+				c(betaf, betal) ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=df)
+precis(sim_mod, prob=0.95)
+```
+
+```{r}
+
+# DAG 1
+n = 100
+tsd = 0.5 # Decrease to increase correlation
+ff = rnorm(n)
+fat = rnorm(n, -ff, sd=tsd)
+lact = rnorm(n, ff, sd=tsd)
+kilo = rnorm(n, fat - lact)
+
+df = data.frame(k=kilo, f=fat, l=lact)
+
+pairs(df)
+cor(df)
+
+sim_mod = quap(
+			alist(
+				k ~ dnorm(mu, sigma),
+				mu <- beta0 + betaf*f + betal*l,
+				beta0 ~ dnorm(0, 3),
+				c(betaf, betal) ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=df)
+precis(sim_mod, prob=0.95)
+```
+
+```{r}
+
+# DAG 1
+n = 100
+tsd = 0.1 # Decrease to increase correlation
+ff = rnorm(n)
+fat = rnorm(n, -ff, sd=tsd)
+lact = rnorm(n, ff, sd=tsd)
+kilo = rnorm(n, fat - lact)
+
+df = data.frame(k=kilo, f=fat, l=lact)
+
+pairs(df)
+cor(df)
+
+sim_mod = quap(
+			alist(
+				k ~ dnorm(mu, sigma),
+				mu <- beta0 + betaf*f + betal*l,
+				beta0 ~ dnorm(0, 3),
+				c(betaf, betal) ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=df)
+precis(sim_mod, prob=0.95)
+```
+
+Explore the posteriors
+
+```{r}
+library(patchwork)
+library(ggplot2)
+library(rethinking)
+
+sds = c(1, 0.5, 0.1, 0.01)
+diffs = list()
+
+count = 1
+for(tsd in sds){
+
+	# DAG 1
+	set.seed(10)
+	n = 100
+	ff = rnorm(n)
+	fat = rnorm(n, -ff, sd=tsd)
+	lact = rnorm(n, ff, sd=tsd)
+	kilo = rnorm(n, fat - lact)
+
+	df = data.frame(k=kilo, f=fat, l=lact)
+
+	sim_mod = quap(
+				alist(
+					k ~ dnorm(mu, sigma),
+					mu <- beta0 + betaf*f + betal*l,
+					beta0 ~ dnorm(0, 3),
+					c(betaf, betal) ~ dnorm(0, 3),
+					sigma ~ dexp(1)
+					), data=df)
+
+	post = extract.samples(sim_mod)
+	prior = rnorm(10000, 0, 3)
+	
+	diffs[[count]] = post$betaf - post$betal
+	count = count + 1
+
+	p1 = ggplot() + geom_point(aes(x=post$betal, y=post$betaf)) + theme_classic() +
+			   xlab("beta_l") + ylab("beta_f")
+	p2 = ggplot() + geom_density(aes(x=post$betal, color="post.")) + 
+					geom_density(aes(x=prior, color="prior")) + 
+					theme_classic() + xlab("beta_l")
+	p3 = ggplot() + geom_density(aes(x=post$betaf, color="post.")) + 
+					geom_density(aes(x=prior, color="prior")) +  theme_classic() + xlab("beta_f")
+
+	ptot = p1 + p2 + p3
+	ggsave(paste0("compare_posterior_sd=", tsd, ".pdf"), width=8, height=3)
+}
+
+# Plot the histograms of the differences
+ggplot() + geom_density(aes(x=diffs[[1]], color="sd = 1 (Low correlation)")) +
+           geom_density(aes(x=diffs[[2]], color="sd = 0.5 (Medium correlation)")) +
+           geom_density(aes(x=diffs[[2]], color="sd = 0.1 (High correlation)")) +
+           geom_density(aes(x=diffs[[3]], color="sd = 0.01 (Very high correlation)")) + theme_bw() + xlab("beta_fat - beta_lactose")
+
+ggsave("differences_in_beta.pdf", width=8, height=4)
+
+```
+
+Demonstrate that the difference $\beta_f - \beta_l$ is identifiable even when parameters are highly correlated.
+
+```{r}
+# DAG 1
+set.seed(10)
+n = 100
+tsd= 0.01 # High correlation between lactose and fat
+ff = rnorm(n)
+fat = rnorm(n, -ff, sd=tsd)
+lact = rnorm(n, ff, sd=tsd)
+kilo = rnorm(n, fat - lact)
+
+df = data.frame(k=kilo, f=fat, l=lact)
+
+sim_mod = quap(
+  alist(
+    k ~ dnorm(mu, sigma),
+    mu <- beta0 + betaf*f + betal*l,
+    beta0 ~ dnorm(0, 3),
+    c(betaf, betal) ~ dnorm(0, 3),
+    sigma ~ dexp(1)
+  ), data=df)
+
+# Plot the posterior of the difference
+post = extract.samples(sim_mod)
+tdiff = post[, 2] - post[, 3]
+ggplot() + geom_density(aes(x=tdiff)) + xlab("beta_f - beta_l") + ylab("density") + theme_bw()
+precis(tdiff)
+```
+
+
+Same as above, but with a lot of samples
+
+```{r}
+library(patchwork)
+library(ggplot2)
+library(rethinking)
+
+sds = c(1, 0.5, 0.1, 0.01)
+diffs = list()
+
+count = 1
+for(tsd in sds){
+
+	# DAG 1
+	set.seed(10)
+	n = 10000
+	ff = rnorm(n)
+	fat = rnorm(n, -ff, sd=tsd)
+	lact = rnorm(n, ff, sd=tsd)
+	kilo = rnorm(n, fat - lact)
+
+	df = data.frame(k=kilo, f=fat, l=lact)
+
+	sim_mod = quap(
+				alist(
+					k ~ dnorm(mu, sigma),
+					mu <- beta0 + betaf*f + betal*l,
+					beta0 ~ dnorm(0, 3),
+					c(betaf, betal) ~ dnorm(0, 3),
+					sigma ~ dexp(1)
+					), data=df)
+
+	post = extract.samples(sim_mod)
+	prior = rnorm(10000, 0, 3)
+
+	diffs[[count]] = post$betal + post$betaf
+	count = count + 1
+
+	p1 = ggplot() + geom_point(aes(x=post$betal, y=post$betaf)) + theme_classic() +
+			   xlab("beta_l") + ylab("beta_f")
+	p2 = ggplot() + geom_density(aes(x=post$betal, color="post.")) + 
+					geom_density(aes(x=prior, color="prior")) + 
+					theme_classic() + xlab("beta_l")
+	p3 = ggplot() + geom_density(aes(x=post$betaf, color="post.")) + 
+					geom_density(aes(x=prior, color="prior")) +  theme_classic() + xlab("beta_f")
+
+	ptot = p1 + p2 + p3
+	ggsave(paste0("compare_posterior_sd=", tsd, "big_sample.pdf"), width=8, height=3)
+}
+
+```
+
+
+
+
+
+
+```{r}
+df = read.csv("milk_challenge.csv")
+df
+
+
+mod_fat = quap(
+			alist(
+				kilo ~ dnorm(mu, sigma),
+				mu <- beta0 + betaf*fat,
+				beta0 ~ dnorm(0, 3),
+				betaf ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=df)
+precis(mod_fat, prob=0.95)
+
+
+
+mod_fat_lac = quap(
+			alist(
+				kilo ~ dnorm(mu, sigma),
+				mu <- beta0 + betaf*fat + betal*lactose,
+				beta0 ~ dnorm(0, 3),
+				betaf ~ dnorm(0, 3),
+				betal ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=df)
+precis(mod_fat_lac, prob=0.95)
+
+# You cannot approximate the total effect of lactose and fat on energy content because of co-linearity. 
+
+```
+
+## Milk challenge
+
+```{r}
+df = read.csv("milk_challenge.csv")
+df
+
+# Fit a model with only fat
+mod_fat = quap(
+ 			alist(
+ 				kilo ~ dnorm(mu, sigma),
+ 				mu <- beta0 + betaf*fat,
+ 				beta0 ~ dnorm(0, 3),
+ 				betaf ~ dnorm(0, 3),
+ 				sigma ~ dexp(1)
+ 				), data=df)
+
+precis(mod_fat, prob=0.95)
+
+# Fit a model with both covariates
+mod_fat_lact = quap(
+ 			alist(
+ 				kilo ~ dnorm(mu, sigma),
+ 				mu <- beta0 + betaf*fat + betal*lactose,
+ 				beta0 ~ dnorm(0, 3),
+ 				c(betaf, betal) ~ dnorm(0, 3),
+ 				sigma ~ dexp(1)
+ 				), data=df)
+
+precis(mod_fat_lact, prob=0.95)
+```

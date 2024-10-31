@@ -1,0 +1,770 @@
+---
+title: "Introduction to HMC and Stan"
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+# Learning objectives
+
+1.  Conceptually understand how Hamiltonian Monte Carlo is generating estimates of the posterior distribution
+2.  Use the function `ulam` to sample from Bayesian models
+3.  Visualize and interpret the output of Markov chains to assess model convergence using traceplots, effective sample size, trace rank plots, and $\hat{R}$
+4.  Understand Stan code syntax and write a simple linear model in raw Stan code
+
+# Overview
+
+Hamiltonian Monte Carlo provides a efficient way for us to draw samples from arbitrary posterior distributions.
+Hamiltonian Monte Carlo is the work-horse behind Stan and is what we are going to be using moving forward in the class.
+We are not going to be concerned with the math behind MCMC.
+We are going to be concerned with interpreting output from HMC and diagnosing when HMC is warning you that your model is mis-specified.
+
+# Getting HMC going on your computer
+
+The function that we will use to start interfacing with Stan is called `ulam` (named after Stanislaw Ulam, one of the co-inventors of Monte Carlo).
+
+```{r}
+library(rethinking)
+library(ggplot2)
+
+?ulam
+
+```
+
+Let's start by exploring two models that we are familiar with from earlier in class
+
+## Revisiting red-tailed hawk attack rates
+
+We introduced the concept of posterior distributions using an example of red-tailed hawks attacking hidden prey items.
+The model that we are trying to fit is
+
+$$
+\begin{aligned}
+\text{number of successes} &\sim \text{Binomial}(p_{rt}, N=8) \\
+p_{rt} &\sim \text{Uniform}(0, 1)
+\end{aligned}
+$$ where $N = 8$ is the number of trials, `number of successes` is the number of successful red-tailed hawk attacks, $p_{rt}$ is a parameter specifying the probability of a given red-tailed hawk having a successful attack on a trial.
+In terms of probability statements, we could write
+
+$$
+[p_{rt} | \text{number of success}, N=8] = \frac{[\text{number of success} | p_{rt}, N=8][p_{rt}]}{\int_{p_{rt}} [\text{number of success} | p_{rt}, N=8][p_{rt}] dp_{rt}} 
+$$ Our goal is to estimate the posterior distribution $[p_{rt} | \text{number of success}, N=8]$.
+Remember that for red-tailed hawks, `number of successes` = 0.
+The code below is how we estimated the posterior distribution previously using a grid approximation.
+
+```{r}
+## Red-tailed hawk inference
+
+### Grid approximation
+
+# 1. Define your grid
+p_grid = seq(0, 1, len=100)
+
+# 2. Define your prior
+prior = dunif(p_grid, 0, 1)
+
+# 3. Define your likelihood
+likelihood = dbinom(0, size=8, prob=p_grid)
+
+# 4. Unnormalized posterior
+unnorm_posterior_red = likelihood * prior
+
+# Normalize posterior
+posterior_red = unnorm_posterior_red / sum(unnorm_posterior_red)
+
+ggplot() + geom_line(aes(x=p_grid, y=posterior_red)) + theme_classic()
+
+### Quadratic approximation
+
+# You can't get it to converge because the MAP is on the boundary
+# There is no curvature!
+# An inherent problem with the quap approach
+
+redtailed = quap(
+		alist(
+				Y ~ dbinom(Y + F, p),
+				p ~ dunif(0, 1)
+		),
+		data=list(Y=0, F=8))
+```
+
+While we could estimate a posterior using a grid approximation, we couldn't estimate a posterior using the `quap` approach.
+**Why not?**
+
+A: The posterior distribution doesn't have a mode and that is what quap is looking for.
+
+### Using HMC to fit red-tailed hawks
+
+This is an easy problem for HMC to fix.
+Below is the code to estimate the posterior distribution of $p_{rt}$ using HMC and `ulam`.
+
+**Note**: Stan uses C++ code under the hood so it needs to compile.
+This takes a moment.
+
+```{r}
+redtailed_hmc = ulam(
+		alist(
+				Y ~ dbinom(Y + F, p),
+				p ~ dunif(0, 1)
+		),
+		data=list(Y=0, F=8), 
+		chains=4, cores = 4, warmup=500, iter = 2000) 
+```
+
+Before interpreting the the output above, let's look at the posterior estimate of $p_{rt}$ and compare it to our estimate from the grid approximation.
+
+```{r}
+# Extract the posterior...just like we did before
+post = extract.samples(redtailed_hmc)
+
+# How many posterior samples do we have?
+dim(post$p) # 4 chains, 500 samples each chain that aren't warm-up = 2000 samples
+
+# Let's draw 2000 samples from our grid approximation posterior
+post_grid = sample(p_grid, 2000, replace=T, prob=posterior_red)
+
+# Compare to the grid approximation and the HMC posterior
+ggplot() + geom_histogram(aes(x=post$p, fill="HMC"), alpha=0.5) + 
+           geom_histogram(aes(x=post_grid, fill="Grid"), alpha=0.5) +
+           xlab("probability of success") +
+           theme_classic()
+```
+
+The posterior distributions are effectively identical!
+
+## Understanding the output of `ulam` and HMC
+
+Let's fit the model again so we can see the output and think about the function arguments
+
+`ulam` takes a few different arguments than `quap`.
+Here are three important arguments.
+
+-   `chains`: This specifies the number of Markov chains you want to run. You always want more than one (4 is the a good number to use) to help assess convergence of HMC to the true posterior.
+-   `warmup`: HMC needs a bit of time to tune itself before sampling from the posterior. This usually happens quite quickly. Typically use between 500 and 1000 warmup steps, but sometimes you need less (and sometimes more).
+-   `iter`: The total number of samples you want your Markov chain to take **including** warmup samples. So if warmup is 500 and iter is 2000, your markov chain will draw 1500 samples from the posterior.
+-   `cores`: The number of cores on your computer you want to use the process the chains. If you have 4 cores and 4 chains, your computer will run each chain simultaneously and you don't have to wait for each chain to finish sequentially. By default, it is one chain per core, so don't specify more cores than you have chains (it is not a problem, it just won't help you at all).
+
+`ulam` has other arguments that we will eventually encounter.
+You can check them with `?ulam`
+
+Now run the model again
+
+```{r}
+redtailed_hmc = ulam(
+		alist(
+				Y ~ dbinom(Y + F, p),
+				p ~ dunif(0, 1)
+		),
+		data=list(Y=0, F=8), 
+		chains=4, warmup=500, cores=1, iter=2000)
+```
+
+Stan spits out a progress report of where the sampler is.
+This is helpful for monitoring how much more sampling needs to happen -- even with HMC, sampling can sometimes be slow for complex models.
+
+-   Stan prints a progress report for each chain for warmup and sampling
+-   Stan will also print any warnings that it encounters when sampling (e.g., divergent iterations)
+
+## Diagnosing your Markov chains: Traceplots
+
+Before making any inference from your posterior, you want to check that your HMC sampler is actually performing like it should and sampling from the posterior you are interested in.
+The first way to check this is using **traceplots**.
+
+**For traceplots, we are looking for all chains to be overlapping and for them to look like "fuzzy caterpillars"**
+
+This tells us that
+
+1.  Each chain is sampling the same posterior distribution
+2.  They have adequately explored the posterior distribution
+
+We can use the `traceplot` function in `rethinking`
+
+```{r}
+traceplot(redtailed_hmc)
+
+```
+
+**Interpretation**: Each colored line is one of our four Markov chains.
+They are all overlapping and look like fuzzy caterpillars so each is sampling from the same posterior distribution.
+Visually, convergence looks good.
+
+## Diagnosing the Markov chains: Trace-rank plots
+
+Another type of plot that is helpful for diagnosing convergence of the HMC algorithm is the trace-rank plot.
+In these plots, what we are doing is combining all of our samples across chains, ranking them, dividing them again into the respective chains, and then plotting histograms of the ranks.
+**We want these histograms to be overlapping with no clear pattern indicating that one chain doesn't have higher or lower ranked samples than another**
+
+```{r}
+trankplot(redtailed_hmc)
+```
+
+**Interpretation**: Sometimes green is higher, sometimes yellow is higher, sometimes purple is higher, sometimes orange is higher -- this is exactly what we want, indicating that ranks from one chain are not consistently higher or lower than another chain.
+
+```{r}
+# This is an example of a bad trace-rank plot. (The plot is bad, not the method. The method is just explicitly laid out for educational purposes.)
+# Convince yourself this works by sampling from three separate
+# distributions
+num = 1000
+chain1 = rnorm(num, mean=0, sd=1)
+chain2 = rnorm(num, mean=1, sd=1)
+chain3 = rnorm(num, mean=2, sd=1)
+labels = rep(c(1, 2, 3), c(num, num, num))
+combine_df = data.frame(label = labels, value=c(chain1, chain2, chain3))
+combine_df$rank = rank(combine_df$value)
+
+ggplot(combine_df) + geom_histogram(aes(x=rank, color=as.factor(label)), fill="transparent", position=position_identity()) + theme_classic()
+
+```
+
+## Diagnosing the Markov chains: $\hat{R}$ and effective sample size
+
+Two key non-visual metrics for assessing Markov chain convergence are the Gelman-Rubin convergence diagnostic $\hat{R}$ and effective sample size
+
+-   $\hat{R}$: Measuring the ratio of the variance between chains and within chains. With convergence, we want these variances to be the same and their ratio to be one. **We want** $\hat{R}$ close to one. The current suggestions are that $\hat{R} < 1.05$ or even $\hat{R} < 1.01$ for valid inference.
+-   `ess_bulk` or `n_eff`: Both are measures of effective sample size of the sampled posterior distribution. Because samples in Markov chains are often correlated, the total number of samples per chain (`iter` - `warmup`) is almost always greater than the effective number of independent samples. Generally, we want `ess_bulk` or `n_eff` to be 100 or more per chain. With four chains, we should have at least 400 effective samples before making inference.
+
+```{r}
+precis(redtailed_hmc)
+```
+
+**Interpretation**: `rhat` is 1, indicating convergence of our chains.
+Note that `rhat` = 1 alone is not sufficient to determine convergence, but combining that with our traceplots, everything looks great.
+We have an effective sample size of 1213.02, far more than the 400 we need.
+So everything looks good.
+
+**Conclusion**: Our posterior distribution of $p_{rt}$ as generated by HMC is a good sample of the true posterior and we can use it to make inference.
+**Note, we could not do this with `quap`**
+
+## Challenge 1: Revisiting green frog body size
+
+Using the `tadpole_svl.csv` data on Canvas, fit the following model using `ulam`.
+
+$$
+\begin{aligned}
+\text{svl_z}_i &\sim \text{Normal}(\mu_i, \sigma) \\ 
+\mu_i &= \beta_0 + \beta_1 \text{algae_z}_i + \beta_2 \text{nutr_z}_i + \beta_3 \text{density_z}_i \\
+\beta_0 &\sim \text{Normal}(0, 5) \\
+\beta_1, \beta_2, \beta_3 &\sim \text{Normal}(0, 3) \\
+\sigma &\sim \text{Exponential}(1)
+\end{aligned}
+$$ Use traceplots, trace rank plots, $\hat{R}$, and effective sample size to determine convergence of HMC.
+Discuss with your neighbors and compare your results with a `quap` model (particularly, compare the posterior distribution for $\sigma$)
+
+Challenge problem answer that I worked on (answer by Mark to follow)
+
+```{r}
+# Load and scale data
+svl_dat = read.csv("tadpole_svl.csv")
+svl_dat_z = as.data.frame(scale(svl_dat))
+head(svl_dat_z)
+```
+
+```{r}
+svl_hmc = ulam(
+		alist(
+				svl_z ~ dnorm(mu, sigma),
+				mu <- beta0 + beta1 * algae + beta2 * nutr + beta3 * density,
+				beta0 ~ dnorm(0, 5),
+				c(beta1, beta2, beta3) ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+		), data=svl_dat_z, 
+            warmup=500, iter=1500, chains=4)
+```
+
+```{r}
+traceplot(svl_hmc)
+```
+
+```{r}
+trankplot(svl_hmc)
+```
+
+-----------------Scroll below to see the answers---------------
+
+```{r}
+# Load and scale data
+svl_dat = read.csv("tadpole_svl.csv")
+svl_dat_z = as.data.frame(scale(svl_dat))
+head(svl_dat_z)
+```
+
+```{r}
+# Fit the model with HMC
+tad_mod = ulam(
+               alist(
+            svl ~ dnorm(mu, sigma),
+            mu <- beta0 + beta1*algae + beta2*nutr + beta3*density,
+            beta0 ~ dnorm(0, 5),
+            c(beta1, beta2, beta3) ~ dnorm(0, 3),
+            sigma ~ dexp(1)
+               ), data=svl_dat_z, 
+            warmup=500, iter=1500, chains=4)
+```
+
+Check the traceplot
+
+```{r}
+traceplot(tad_mod)
+traceplot(tad_mod, pars="sigma")
+```
+
+All plots look like fuzzy caterpillars, indicating convergence is pretty good.
+
+```{r}
+trankplot(tad_mod)
+```
+
+No clear pattern of ordering.
+Convergence looks good.
+
+```{r}
+precis(tad_mod)
+```
+
+$\hat{R} = 1$ for all parameters and `ess_bulk` \> 400.
+It looks like all chains are mixing.
+
+Now check the `quap` model
+
+```{r}
+tad_mod_quap = quap(
+               alist(
+            svl ~ dnorm(mu, sigma),
+            mu <- beta0 + beta1*algae + beta2*nutr + beta3*density,
+            beta0 ~ dnorm(0, 5),
+            c(beta1, beta2, beta3) ~ dnorm(0, 3),
+            sigma ~ dexp(1)
+               ), data=svl_dat_z)
+precis(tad_mod_quap)
+```
+
+Compare the $\sigma$ posterior from HMC and `quap`
+
+```{r}
+# HMC
+post1 = extract.samples(tad_mod)
+n = dim(post1$sigma)[1]
+
+# Quap
+post2 = extract.samples(tad_mod_quap, n=n)
+
+# Plot the posterior distributions
+comp_post = data.frame(value=c(post1$sigma, post2$sigma),
+                       label=rep(c("hmc", "quap"), c(n, n)))
+ggplot(comp_post) + geom_density(aes(x=value, color=label)) + theme_classic()
+```
+
+We are getting different shaped posteriors between `quap` and `ulam`.
+`quap` is an approximation and makes everything Gaussian.
+HMC and `ulam` is sampling from the exact posterior and provides a better representation of the posterior.
+From now on, we should always being using `ulam`!
+
+## Challenge 2: Explore problematic chains
+
+It is helpful to know what problematic chains look like.
+Let's simulate some data
+
+```{r}
+# Load in your milk_challenge data from previous lectures
+bad_dat = read.csv("milk_challenge.csv")
+my_response = bad_dat$kilo
+```
+
+Now fit the following model
+
+```{r}
+bad_mod = alist(
+            y ~ dnorm(mu, sigma),
+            mu <- beta0 + beta1,
+            c(beta0, beta1) ~ dnorm(0, 100),
+            sigma ~ dexp(1)
+            )
+
+# Fit the bad model
+bad_fit = ulam(bad_mod, data=list(y=my_response), iter=500, chains=1)
+```
+
+Explore the convergence of this model using the diagnostics we just learned and discuss.
+Try setting the priors to `c(beta0, beta1) ~ dnorm(0, 10)`.
+What happens?
+
+```{r}
+traceplot(bad_fit)
+trankplot(bad_fit)
+```
+
+# Introduction to Stan code
+
+While packages like `rethinking`, `brms`, and `rstanarm` do a lot of the heavy lifting for us regarding Stan code, it is helpful to know what Stan code actually looks like.
+Some times `rethinking` will spit back errors and show you the Stan code, so it is good to know what you are looking at.
+Also, as you start fitting more complex models, you are going to want to code them up directly in Stan.
+
+## The key components of Stan code
+
+Stan code is written in chunks (or "program blocks").
+The three key program blocks are
+
+-   `data`: Where data is defined
+-   `parameters`: Where parameters are defined
+-   `model`: Where the model is defined
+
+Other program blocks include
+
+-   `transformed data`: Where you can perform manipulations on data passed in
+-   `transformed parameters`: Where you can manipulated parameters you have defined
+-   `generate quantities`: Where you can calculate new quantities from your posterior distributions (e.g., composite parameters)
+-   `functions`: Where you can define custom functions
+
+Let's return to our red-tailed hawk model to look at a very simple Stan program.
+I am going to define and fit the model again here.
+
+```{r}
+redtailed_hmc = ulam(
+		alist(
+				Y ~ dbinom(Y + F, p),
+				p ~ dunif(0, 1)
+		),
+		data=list(Y=0, F=8), 
+		chains=4, warmup=500)
+```
+
+What the `rethinking` package does is it takes the nice syntax you wrote above and transforms it into Stan language and a Stan model.
+We can look at the resulting Stan code using the function `stancode`
+
+```{r}
+stancode(redtailed_hmc)
+```
+
+Notice the three program blocks of `data`, `parameters`, and `model`.
+When we define our data we have to specify the *type* of the data.
+**This is really important and leads to a lot of errors when coding directly in Stan**.
+
+-   $Y$ is the number of successes. IT MUST BE AN INTEGER (given by `int`)
+-   $F$ is the number of failures. IT MUST BE AN INTEGER (given by `int`)
+-   $p$ is a probability. IT MUST BE A REAL BOUNDED BETWEEN 0 AND 1 (given by `real<lower=0, upper=1>`)
+
+`rethinking` takes care of the types for you, but be careful with this!
+
+In the model block, notice we have a model that looks really familiar.
+We have our prior distribution given by `p ~ uniform( 0 , 1 );` and our likelihood given by `Y ~ binomial( Y + F , p );`.
+A few points
+
+1.  Completed lines in Stan must end with a semi-colon.
+2.  `dnorm` is the same as `normal` and `dbinom` is the same as `binomial`. Stan has slightly different names for probability distributions. Keep that in mind.
+
+How could we run this Stan model **without** the rethinking package
+
+1.  Write your model out as a character in R (or write it in a text editor)
+
+```{r}
+# Write your stan file
+my_stan_model = "
+data{
+     int F;
+     int Y;
+}
+parameters{
+     real<lower=0,upper=1> p;
+}
+model{
+    p ~ uniform( 0 , 1 );
+    Y ~ binomial( Y + F , p );
+}
+"
+```
+
+Save the Stan model as a `.stan` file
+
+```{r}
+# Save to a stan file (this is just a text file with the extension .stan)
+# dir: what directory to save this file in: . is the current directory
+# basename : the name of the file that will be given a stan extension
+write_stan_file(my_stan_model, dir=".", basename="my_stan_file") # dir = '.' puts it in the current wokring directory 
+```
+
+Compile your model
+
+```{r}
+# Load the cmdstanr library
+library(cmdstanr)
+library(posterior)
+install.packages("bayesplot") # You will probably need to install this
+library(bayesplot)
+
+# Compile your model
+my_mod = cmdstan_model("my_stan_file.stan")
+```
+
+Now `my_mod` is a compiled model object that has attributes you can use
+
+```{r}
+# Use $ to access the "attributed" and "methods" of the STAN model 
+# Print your model
+my_mod$print()
+```
+
+You now need to define your data in R as a list to **exactly match** the data as defined in your model
+
+```{r}
+# You must have variables named Y and F (match the names in your STAN model)
+stan_data = list(Y=0, F=8)
+```
+
+Fit your Stan model
+
+```{r}
+# This method is adjacent to "ulam" in the rethinking package 
+model_fit = my_mod$sample(data=stan_data,
+                       chains=4,
+                       iter_warmup=500,
+                       iter_sampling=1000,
+                       parallel_chains=1)
+```
+
+Explore the diagnostics or your Stan model
+
+```{r}
+# "summany" is adjacent to "precis"
+# Check summary and diagnostics
+model_fit$summary()
+
+# mad: mean absolute deviation
+# q5, q95: lower and upper quartiles 
+```
+
+Looks similar to `precis` in `rethinking` but with some extra detail.
+
+You can also leverage the `posterior` and `bayesplot` packages to explore the model diagnostics
+
+```{r}
+# Extract posterior and look at diagnostic plots
+post = model_fit$draws()  # similar to "extract.samples" in rethinking package 
+mcmc_trace(post) # traceplot
+mcmc_rank_overlay(post) #"trank" plot 
+```
+
+```{r}
+# Convert posterior draws to a data.frame
+post_df = as_draws_df(post) 
+post_df
+```
+
+## Fitting green frog body size with Stan
+
+```{r}
+# Load and scale data
+svl_dat = read.csv("tadpole_svl.csv")
+svl_dat_z = as.data.frame(scale(svl_dat))
+head(svl_dat_z)
+
+# Fit the model with HMC
+tad_mod = ulam(
+               alist(
+            svl ~ dnorm(mu, sigma),
+            mu <- beta0 + beta1*algae + beta2*nutr + beta3*density,
+            beta0 ~ dnorm(0, 5),
+            c(beta1, beta2, beta3) ~ dnorm(0, 3),
+            sigma ~ dexp(1)
+               ), data=svl_dat_z, 
+            warmup=500, iter=1500, chains=4)
+
+```
+
+We can now look at the Stan code
+
+```{r}
+stancode(tad_mod)
+```
+
+Let's re-write this model slightly
+
+```{r}
+
+tad_mod_stan = "
+data{
+     int N;
+     vector[N] area;
+     vector[N] svl;
+     vector[N] density;
+     vector[N] nutr;
+     vector[N] algae;
+}
+parameters{
+     real beta0;
+     real beta1;
+     real beta2;
+     real beta3;
+     real<lower=0> sigma;
+}
+model{
+
+    vector[25] mu;
+    sigma ~ exponential( 1 );
+    beta0 ~ normal( 0 , 5 );
+    beta1 ~ normal( 0 , 3 );
+    beta2 ~ normal( 0 , 3 );
+    beta3 ~ normal( 0 , 3 );
+    for ( i in 1:N ) {
+        mu[i] = beta0 + beta1 * algae[i] + beta2 * nutr[i] + beta3 * density[i];
+    }
+    svl ~ normal( mu , sigma );
+}
+"
+```
+
+Hopefully you can still see the gist of our Bayesian model in there.
+A few things are more complicated with this model.
+
+1.  In `data` we need to specify how long each of our data vectors are. They are all 25 long. It is helpful to specify a data variable `N` that contains the information on the length of your data.
+2.  The `parameters` block looks similar.
+3.  The difference in the `model` block is that we define a new *intermediate* variable `mu` that we will use to store our estimates for of the mean for each sample $i$. We use a for loop to loop over our dataset of length `N` and define each `mu`.
+
+Let's now fit this model directly with `cmdstanr`
+
+```{r}
+# Define model
+write_stan_file(tad_mod_stan, dir=getwd(), basename="tad_mod.stan")
+tad_mod = cmdstan_model("tad_mod.stan")
+```
+
+```{r}
+# Define data
+stan_data = list(N=nrow(svl_dat_z), 
+                 svl=svl_dat_z$svl, 
+                 algae=svl_dat_z$algae,
+                 density=svl_dat_z$density,
+                 nutr=svl_dat_z$nutr,
+                 area=svl_dat_z$area
+                 )
+
+# Fit model
+tad_fit = tad_mod$sample(data=stan_data,
+                           iter_warmup=500,
+                           iter_sampling=1500,
+                           chains=4)
+```
+
+Summarize model
+
+```{r}
+tad_fit$summary()
+```
+
+Explore diagnostics
+
+```{r}
+post = tad_fit$draws()
+mcmc_trace(post)
+mcmc_rank_overlay(post)
+```
+
+## Challenge: Revisiting the deer data
+
+Load in the deer data.
+Try to fit the following model directly in Stan without using the `rethinking` package
+
+$$
+\begin{aligned}
+\text{average buck antler score}_i &\sim \text{Normal}(\mu_i, \sigma) \\
+\mu_i &= \beta_0 + \beta_1 (\text{average doe weight}_i - \overline{\text{average doe weight}}) \\
+\beta_0 &\sim \text{Normal}(129, 10) \\
+\beta_1 &\sim \text{Normal}(0, 5) \\
+\sigma &\sim \text{Uniform}(0, 50)
+\end{aligned}
+$$
+
+```{r}
+# Trying the problem myself 
+deer_dat = read.csv("deer_data.csv")
+mean_doe_weight = mean(deer_dat$average_doe_weight)
+doe = deer_dat$average_doe_weight - mean_doe_weight
+tad_mod_stan = "
+data{
+     int N;
+     vector[N] average_doe_weight;
+     vector[N] average_buck_antler_score;
+}
+parameters{
+     real beta0;
+     real beta1;
+     real<lower=0, upper=50>> sigma;
+}
+model{
+
+    vector[25] mu;
+    sigma ~ uniform( 0 , 50 );
+    beta0 ~ normal( 129 , 10 );
+    beta1 ~ normal( 0 , 5 );
+    for ( i in 1:N ) {
+        mu[i] = beta0 + beta1 * doe[i] ;
+    }
+    average_buck_antler_score ~ normal( mu , sigma );
+}
+"
+```
+
+--------------------------See below this line for the answer------------------------------
+
+```{r}
+deer_dat = read.csv("deer_data.csv")
+deer_dat$doe_weight_centered = deer_dat$average_doe_weight - mean(deer_dat$average_doe_weight)
+deer_dat
+```
+
+```{r}
+deer_model_stan = "
+data{
+  int N;
+  vector[N] buck;
+  vector[N] doe;
+  
+} parameters {
+  real beta0;
+  real beta1;
+  real<lower=0, upper=50> sigma;
+  
+} model {
+  
+  vector[N] mu;
+  beta0 ~ normal(129, 10);
+  beta1 ~ normal(0, 5);
+  sigma ~ uniform(0, 50);
+  
+  for(i in 1:N){
+    mu[i] = beta0 + beta1*doe[i];
+  }
+
+  buck ~ normal(mu, sigma);
+}
+"
+
+write_stan_file(deer_model_stan, dir=getwd(), basename="deer_model.stan")
+```
+
+```{r}
+deer_model = cmdstan_model("deer_model.stan")
+```
+
+```{r}
+stan_data = list(N=nrow(deer_dat), 
+                 buck=deer_dat$average_buck_antler_score, 
+                 doe=deer_dat$doe_weight_centered)
+
+deer_fit = deer_model$sample(data=stan_data,
+                             iter_warmup=500,
+                             iter_sampling=1500,
+                             chains=4)
+```
+
+```{r}
+deer_fit$summary()
+post = deer_fit$draws()
+
+# Make a nice posterior plot
+mcmc_areas(post,
+           pars = c("beta1"),
+           prob = 0.95)
+```

@@ -1,0 +1,306 @@
+---
+title: "Homework 3"
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# The effect of environmental variability on the reproductive phenology of Antarctic birds
+
+## Background
+
+In this analysis, you are going to focus on two Antarctic bird species: the Adelie Penguin (*Pygoscelis adeliae*) and the Cape Petrel (*Daption capense*). You are interested in how environmental variability (e.g., directional variability like climate change and cyclic variability like El Nino) affects the egg laying dates of these two bird species.
+
+The Adelie Penguin is a medium-sized penguin (c. 4.5 kg), breeding during the austral summer on rocky islands or on coastal nunataks (ice-free areas of the Antarctic continent). Adelies arrive and start building their nest in October and lay their eggs in November. The chicks leave the colonies in early February, just before the winter.
+
+The Cape Petrel is a small (c. 400 g) Procellariiform species and breeds during the austral summer on rocky islands. The breeding period is relatively short because birds arrive in October, lay their eggs in November, and the chicks are fledged in early March.
+
+During the breeding period, the two species feed directly on krill or on fish that heavily depend on krill. Krill abundance and distribution are closely related to sea ice. After winters with extensive sea ice, adult krill survival and krill recruitment are high; therefore, krill abundance is higher after winters with extensive sea ice compared to winters with poor sea ice. Thus, you expect that sea ice extent might affect food resources for these birds.
+
+Moreover, other climatic factors such as El Nino and La Nina cycles can affect and nutrient upwelling in Antarctica and can influence krill abundance and the general fitness of the birds, affecting reproduction.
+
+The data set contains the following variables
+
+-   `Year`: The year that a data point was collected
+-   `MSA`: Methanesulphonic acid concentration. A measure of biological activity in the surface of ocean water that is a strong proxy for sea ice extent (high MSA in a given year means high sea ice extent that year). Used to infer sea ice extent when satellite coverage wasn't available.
+-   `SOI`: Southern oscillation index. High, positive values of SOI indicate La Nina conditions and low negative values indicate El Nino conditions.
+-   `species`: A factor with two levels: AdeliePenguin or CapePetrel
+-   `laying_date`: The average day of year where birds within a colony laid eggs
+
+Your goal is to make causal inference on the effects of environmental variability on laying date for each species.
+
+## Question 1
+
+Draw a DAG that you think biologically and causally describes the relationship between the variables in the dataset.
+
+```{r}
+library(dagitty) # Package for building DAGs
+
+# Build your DAG
+#
+#SOI -> LayingDate
+dag2 <- dagitty("dag{
+Species -> LayingDate
+SOI -> MSA
+MSA -> LayingDate
+Year -> SOI
+Year -> MSA
+}")
+
+
+coordinates(dag2) <- list(x=c(Year=1, Species=6, SOI=5,
+                              MSA = 5, LayingDate=10),
+                         y=c(Year=5, Species=7, SOI=9,
+                         	MSA = 1, LayingDate=5))
+# Visualize DAG
+rethinking::drawdag(dag2)
+
+# Look at implied dependencies
+impliedConditionalIndependencies(dag2)
+```
+
+## Question 2
+
+```{r}
+# Reading in the dataset
+library(GGally)
+library(rethinking)
+library(ggplot2)
+bird_data = read.csv("bird_data.csv")
+bird_data
+head(bird_data)
+
+
+bird_data$species = as.factor(bird_data$species)
+bird_data
+ggpairs(bird_data)
+```
+
+Using your DAG, fit Bayesian linear models to answer the following questions. You don't necessarily have to fit a linear model for each question. You may be able to fit one linear model that answers multiple questions. **Hint**: I think you can answer all of these questions with two linear models.
+
+1.  Do average laying dates differ between Adelie Penguins and Cape Petrels?
+2.  Every year, are the laying dates increasing, decreasing, or staying the same? By how much (in units of days)?
+3.  What is the effect of sea ice extent (using MSA as a proxy) on Adelie Penguin's and Cape Petrel's laying date (assume the effect is the same for both species)?
+4.  What is the effect of the SOI on laying date?
+
+I am purposefully not specifying every component you need in the analyses. Based on what we have learned in class, provide what you think is reasonable information to support your **Bayesian-informed** answers to these questions.
+
+```{r}
+# Species and Year for 1 and 2 
+
+# fitting model with discrete covariate example from lecture code 
+#head(bird_data)
+
+# Get design matrix
+X = model.matrix(formula(~species), data=bird_data)
+#X
+
+df1 = data.frame(X)
+colnames(df1) = c("int", "CP")
+df1$laying_date = bird_data$laying_date
+df1$year = bird_data$Year
+#df1 
+# Fit the Bayesian model
+fit1 = quap(
+		alist(
+			laying_date ~ dnorm(mu, sigma),
+			mu <- beta0*int + beta1*CP + beta2*year,
+			#beta0 ~ dnorm(mean(df1$laying_date), 3),
+			c(beta0, beta1, beta2) ~ dnorm(0, 3),
+			sigma ~ dexp(1)), data=df1)
+precis(fit1, prob=0.95)
+
+post = extract.samples(fit1, n=10000)
+post
+
+diff_date = mean(post[,2])
+diff_date
+
+quantile(post[,2], c(0.025, 0.5, 0.975))
+
+```
+
+1.  Do average laying dates differ between Adelie Penguins and Cape Petrels?
+
+The average laying dates differ by about 16.51 days, where the Cape Petrels' laying date is that many days after that of the Adelie penguins.
+
+```{r}
+quantile(post[,3], c(0.025, 0.5, 0.975))
+```
+
+2.  Every year, are the laying dates increasing, decreasing, or staying the same? By how much (in units of days)?
+
+The laying date is increasing, or moving later in the year, my a very small amount each year.
+
+```{r}
+# question 3
+# Species, MSA
+
+df2 = data.frame(X)
+colnames(df2) = c("int", "CP")
+df2$laying_date = bird_data$laying_date
+df2$MSA = bird_data$MSA
+#df2 
+# Fit the Bayesian model
+fit2 = quap(
+		alist(
+			laying_date ~ dnorm(mu, sigma),
+			mu <- beta0*int + beta1*CP + beta2*MSA,
+			beta0 ~ dnorm(mean(df1$laying_date), 2),
+			c(beta1, beta2) ~ dnorm(0, 9),
+			sigma ~ dexp(1)), data=df2)
+precis(fit2, prob=0.95)
+
+post2 = extract.samples(fit2, n=10000)
+#post2
+#diff_date2 = mean(post2[,3])
+#diff_date2
+
+quantile(post2[,3], c(0.025, 0.5, 0.975))
+```
+
+3.  What is the effect of sea ice extent (using MSA as a proxy) on Adelie Penguin's and Cape Petrel's laying date (assume the effect is the same for both species)?
+
+Based on the credible interval around the mean effect of MSA on laying date, since 0 is not included in the credible interval, we conclude that MSA has a negative effect on the laying date. That is, an increase in MSA causes the laying date to occur earlier in the year.
+
+```{r}
+# question 4 
+# species, SOI, Year
+
+df3 = data.frame(X)
+colnames(df3) = c("int", "CP")
+df3$laying_date = bird_data$laying_date
+df3$SOI = bird_data$SOI
+df3$year = bird_data$Year
+#df3 
+
+# Fit the Bayesian model
+fit3 = quap(
+		alist(
+			laying_date ~ dnorm(mu, sigma),
+			mu <- beta0*int + beta1*CP + beta2*SOI + beta3 * year,
+			beta0 ~ dnorm(mean(df1$laying_date), 5),
+			c(beta1, beta2, beta3) ~ dnorm(0, 5),
+			sigma ~ dexp(1)), data=df3)
+precis(fit3, prob=0.95)
+
+# Extract the mean laying date for Cape Petrals 
+post3 = extract.samples(fit3, n=10000)
+post3
+
+#diff_date3 = mean(post3[,2])
+#diff_date3
+
+quantile(post3[,3], c(0.025, 0.5, 0.975))
+
+```
+
+4.  What is the effect of the SOI on laying date?
+
+Based on the credible interval around the mean effect of SOI on laying date, since 0 is not included in the credible interval, we conclude that SOI has a negative effect on the laying date. That is, an increase in SOI causes the laying date to occur earlier in the year.
+
+## Question 3
+
+For each model that you fit, use mean distributions/posterior predictive distributions (**hint**: explore the function `postcheck` in `rethinking`), residual plots (plot predicted values vs. residuals), and qqplots to assess the fit of your model(s). Also check whether there are any inconsistencies between the implied dependencies of your DAG and the correlations you are seeing in your data.
+
+Draw some conclusions on whether you think it is appropriate to draw any biological inference from these models based on whether they meet your assumptions.
+
+### Model 1
+
+```{r}
+#predictive/ mean distributions
+postcheck(fit1, prob=0.95, window = 100, n=10000)
+```
+
+Note: cases 1-33 represent the Adelie Penguins and cases 34-56 are the Cape Petrels
+
+From this plot, we can say that Model 1 predicts the data well. Most of the blue (true) data points are contained in the 95% credible interval surrounding each prediction.
+
+```{r}
+# residual plot
+library(patchwork)
+# Median residuals
+laydate = link(fit1)
+mean_laydate = colMeans(laydate)
+resid = bird_data$laying_date - mean_laydate
+
+# QQplot to check normality
+df = data.frame(resid=resid, x=bird_data$Year)
+p = ggplot(df, aes(sample = resid))
+pq = p + stat_qq() + stat_qq_line() + theme_classic()
+
+# Residual plot to check equal variance
+pr = ggplot(df, aes(x=mean_laydate, y=resid)) + geom_point() + geom_hline(aes(yintercept=0), linetype="dashed") + xlab("Fitted Value") + ylab("residual") + theme_classic()
+
+pq+pr
+```
+Since most of the data is near or on the black line, the QQ plot indicates normality. The residuals plot shows fairly even disbursement across the black line. This supports homoscedasticity. The two groups o points represent the two bird species. 
+
+
+
+### Model 2
+
+```{r}
+#predictive/ mean distributions
+postcheck(fit2, prob=0.95, window = 100, n=10000)
+```
+
+From this plot, we can say that Model 1 predicts the data well. Most of the blue (true) data points are contained in the 95% credible interval surrounding each prediction for cases 1-33 and mediocre for cases 34-56. Thus Model 2, is better at predicting for the Adelie Penguins.
+
+```{r}
+# Residual Plot 
+# Median residuals
+laydate = link(fit2)
+mean_laydate = colMeans(laydate)
+resid = bird_data$laying_date - mean_laydate
+
+# QQplot to check normality
+df = data.frame(resid=resid, x=bird_data$Year)
+p = ggplot(df, aes(sample = resid))
+pq = p + stat_qq() + stat_qq_line() + theme_classic()
+
+# Residual plot to check equal variance
+pr = ggplot(df, aes(x=mean_laydate, y=resid)) + geom_point() + geom_hline(aes(yintercept=0), linetype="dashed") + xlab("Fitted Value") + ylab("residual") + theme_classic()
+
+pq+pr
+
+```
+Since most of the data is near or on the black line, the QQ plot indicates normality. The residuals plot shows fairly even disbursement across the black line. This supports homoscedasticity. 
+
+### Model 3
+
+```{r}
+#predictive/ mean distributions
+postcheck(fit3, prob=0.95, window = 100, n=10000)
+```
+
+From this plot, we can say that Model 1 predicts the data well. Most of the blue (true) data points are contained in the 95% credible interval surrounding each prediction.
+
+```{r}
+#residual plot 
+# Median residuals
+laydate = link(fit3)
+mean_laydate = colMeans(laydate)
+resid = bird_data$laying_date - mean_laydate
+
+# QQplot to check normality
+df = data.frame(resid=resid, x=bird_data$Year)
+p = ggplot(df, aes(sample = resid))
+pq = p + stat_qq() + stat_qq_line() + theme_classic()
+
+# Residual plot to check equal variance
+pr = ggplot(df, aes(x=mean_laydate, y=resid)) + geom_point() + geom_hline(aes(yintercept=0), linetype="dashed") + xlab("Fitted Value") + ylab("residual") + theme_classic()
+
+pq+pr
+
+
+```
+Since most of the data is near or on the black line, the QQ plot indicates normality. The residuals plot shows fairly even disbursement across the black line. This supports homoscedasticity. 
+
+## Question 4
+
+Even if you answered no to the above question, for the sake of this homework, interpret your results biologically. What do you conclude about the effects of environmental variability on the reproductive phenology of the two Antarctic bird species?
+
+The environmental variability does appear to have an impact on reproductive phenology. From the models we fit, MSA and SOI have negative relationships with the laying date. That is, increasing the MSA or SOI with decrease the laying date (move the laying date earlier in the year).

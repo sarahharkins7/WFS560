@@ -1,0 +1,1134 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\usepackage{graphicx}
+\makeatletter
+\newsavebox\pandoc@box
+\newcommand*\pandocbounded[1]{% scales image to fit in text height/width
+  \sbox\pandoc@box{#1}%
+  \Gscale@div\@tempa{\textheight}{\dimexpr\ht\pandoc@box+\dp\pandoc@box\relax}%
+  \Gscale@div\@tempb{\linewidth}{\wd\pandoc@box}%
+  \ifdim\@tempb\p@<\@tempa\p@\let\@tempa\@tempb\fi% select the smaller of both
+  \ifdim\@tempa\p@<\p@\scalebox{\@tempa}{\usebox\pandoc@box}%
+  \else\usebox{\pandoc@box}%
+  \fi%
+}
+% Set default figure placement to htbp
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  pdftitle={Homework 2},
+  pdfauthor={Mark Wilber},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Homework 2}
+\author{Mark Wilber}
+\date{2024-09-19}
+
+\begin{document}
+\maketitle
+
+\section{Fitting linear models to understand within-host pathogen
+growth}\label{fitting-linear-models-to-understand-within-host-pathogen-growth}
+
+The amphibian chytrid fungus \emph{Batrachochytrium dendrobatidis} (Bd)
+has led to the declines and extinctions of hundreds of amphibians across
+the globe. The severity of the disease chytridiomycosis (caused by the
+pathogen Bd) depends on how infected individual amphibians are. Thus, it
+is important to understand the dynamics of within-host pathogen growth.
+
+For this homework, you will analyze data on the dynamics of Bd growth on
+the endangered Mountain yellow-legged frog. In this experiment, frogs
+were kept at 12 C or 20 C, exposed to Bd, and swabbed every three days.
+Swabbing the frog allows us to measure how much Bd is on frogs. You are
+asking two questions:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Is the growth rate of Bd on frogs different at 12 and 20 C?
+\item
+  Is the predicted equilibrium Bd load on frogs different at 12 C and 20
+  C?
+\end{enumerate}
+
+Because disease-induced mortality is load-dependent, you ultimately what
+to understand how manipulating temperature might affect infection
+dynamics and mortality.
+
+\subsection{The data}\label{the-data}
+
+The data are given in \texttt{bd\_growth\_data.csv}. The columns are
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \texttt{logload\_t}: Natural log of Bd load on a frog at time \(t\)
+\item
+  \texttt{logload\_tplus1}: Natural log of Bd load on a frog at time
+  \(t + 1\)
+\item
+  \texttt{temp}: Temperature of 12 or 20 C
+\item
+  \texttt{individual}: Individual ID of frogs
+\end{enumerate}
+
+\subsubsection{Question 1}\label{question-1}
+
+Plot the relationship between \texttt{loadload\_t} and
+\texttt{logload\_tplus1} for 12 and 20 C. Describe at least 2
+characteristics of the relationship you are seeing.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(dplyr)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Attaching package: 'dplyr'
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:stats':
+## 
+##     filter, lag
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:base':
+## 
+##     intersect, setdiff, setequal, union
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{bd\_data }\OtherTok{=} \FunctionTok{read.csv}\NormalTok{(}\StringTok{"bd\_growth\_data.csv"}\NormalTok{)}
+\CommentTok{\#head(bd\_data)}
+
+\NormalTok{bd\_12 }\OtherTok{\textless{}{-}}\NormalTok{ bd\_data }\SpecialCharTok{\%\textgreater{}\%} \FunctionTok{filter}\NormalTok{(temp }\SpecialCharTok{==} \StringTok{"12"}\NormalTok{)}
+\CommentTok{\#bd\_12}
+
+\NormalTok{bd\_20 }\OtherTok{\textless{}{-}}\NormalTok{ bd\_data }\SpecialCharTok{\%\textgreater{}\%} \FunctionTok{filter}\NormalTok{(temp }\SpecialCharTok{==} \StringTok{"20"}\NormalTok{)}
+\CommentTok{\#bd\_20}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(ggplot2)}
+\FunctionTok{library}\NormalTok{(patchwork)}
+
+\CommentTok{\# plotting}
+
+\NormalTok{p1 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{(bd\_12)}\SpecialCharTok{+}
+     \FunctionTok{geom\_point}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{logload\_t, }\AttributeTok{y=}\NormalTok{logload\_tplus1, }\AttributeTok{color =} \FunctionTok{as.factor}\NormalTok{(temp)))}\SpecialCharTok{+} 
+      \CommentTok{\#geom\_line(aes(x=logload\_t, y=logload\_tplus1, color="grey")) +}
+     \FunctionTok{theme\_classic}\NormalTok{()  }
+\CommentTok{\#p1}
+
+\NormalTok{p2 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{(bd\_20)}\SpecialCharTok{+}
+     \FunctionTok{geom\_point}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{logload\_t, }\AttributeTok{y=}\NormalTok{logload\_tplus1, }\AttributeTok{color =} \FunctionTok{as.factor}\NormalTok{(temp)))}\SpecialCharTok{+} 
+      \CommentTok{\#geom\_line(aes(x=logload\_t, y=logload\_tplus1, color="grey")) +}
+     \FunctionTok{theme\_classic}\NormalTok{()  }
+\CommentTok{\#p2}
+
+\NormalTok{p1 }\SpecialCharTok{+}\NormalTok{ p2 }
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{homework2_files/figure-latex/unnamed-chunk-2-1.pdf}}
+\textbf{Answer for Q1} From these plots, we can see that the
+relationship between logload\_t and logload\_tplus\_1, for both 12C and
+20C, roughly forms a positive linear relationship. For 12C, the data
+varies more at earlier time steps (i.e.~the data points in the lower
+left are more spread out) and the points as t increases are closer
+together. For the 20C data, there appears to be lower variance at early
+and late time steps than in the ``middle'' time steps.
+
+\subsubsection{Question 2}\label{question-2}
+
+On the natural scale, we might expect Bd load to follow the
+phenomenological, growth curve
+
+\[
+\mu(t + 1) = a x(t)^b
+\] where \(\mu(t + 1)\) is the mean Bd load on the natural scale at time
+\(t + 1\) on a frog and \(x(t)\) is the observed Bd load on the natural
+scale at time \(t\). \(a\) is the per time step growth rate and
+\(b < 1\) is the degree of density-dependence in Bd growth on the frog.
+On the log scale, the Bd growth function is
+
+\[
+\log(\mu(t + 1)) = \log(a) + b \log(x(t))
+\] which we can recognize as a linear model with intercept \(\log(a)\)
+and slope \(b\). The predicted equilibrium log load on a frog
+(conditional on no mortality and loss of infection) is
+
+\[
+\theta = \frac{\log(a)}{1 - b}
+\] \textbf{Your goal}
+
+Fit two Bayesian linear models, one for 12C and one for 20C, where your
+predictor variable is log Bd load at time \(t\) (\(log(x(t))\) or
+\texttt{logload\_t}) and your response variable is log Bd load at time
+\(t + 1\) (\(log(x(t + 1))\) or \texttt{logload\_tplus1}).
+
+For each model
+
+\textbf{Fitting the models}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Write out your full model using the model notation we have been
+  learning in class
+\item
+  Discuss how you chose your prior distributions (it might be helpful to
+  visually justify your prior distributions with prior prediction
+  simulation plots)
+\item
+  Fit each of your models using a quadratic approximation (show the
+  code)
+\item
+  Use posterior simulations and plots to test the validity of your
+  fitted model (see the deer example from class as a template). Discuss
+  whether your data are meeting the assumptions of your model.
+\end{enumerate}
+
+\textbf{Answers for Q2} \textbf{1. The Model}
+
+For \(T={12,20}\),
+
+\[
+\begin{aligned}
+log(x(t+1))_T &\sim \text{Normal}(log(\mu_T), \sigma) \\
+log(\mu_T) &= log(a_{T}) + b_{T} [log(x(t))_T - log(\bar{x}_T)] \\
+log(a_{T}) &\sim \text{Normal}(log(\bar{x}_T), 3) \\
+b_{T} &\sim \text{Normal}(0, 3) \\
+\sigma &\sim \text{Uniform}(0, 5)
+\end{aligned}
+\] where \(\bar{x}_T\) is the mean of the log load at time \(t\) for
+temperature \(T\).
+
+\textbf{2. Justification of Priors}
+
+\(\sigma\): I have no prior knowledge of what the variance should be so
+I chose an uninformative prior. (The plot of this distribution is simply
+a straight line so I will neglect to show it's plot.) \(b_{T}\): This
+represents the slope. I chose a weakly informative prior.
+\(log(a_{T})\): This represents the y-intercept. I chose a normal
+distribution with mean \(\log{\bar{x}_T}\) an a relatively large
+variance to capture a reasonable range of values. \(log(\mu_T)\): I
+chose this form because in the plots in part 1 there appears to be a
+roughly linear relationship between the predictor variable and the
+response variable. \(log(x(t+1))_T\): The chosen prior allows for the
+dependence on the predictor variable and a relatively large variance.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# plot for the prior of b}
+\NormalTok{p\_grid }\OtherTok{=} \FunctionTok{seq}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{5}\NormalTok{, }\AttributeTok{len =} \DecValTok{1000}\NormalTok{)}
+\NormalTok{dp }\OtherTok{=}\NormalTok{ p\_grid[}\DecValTok{2}\NormalTok{] }\SpecialCharTok{{-}}\NormalTok{ p\_grid[}\DecValTok{1}\NormalTok{]}
+\NormalTok{prior\_b }\OtherTok{=} \FunctionTok{dunif}\NormalTok{(p\_grid, }\DecValTok{0}\NormalTok{, }\DecValTok{5}\NormalTok{) }
+\NormalTok{p1 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{p\_grid, }\AttributeTok{y=}\NormalTok{prior\_b}\SpecialCharTok{*}\NormalTok{dp, }\AttributeTok{linetype=}\StringTok{"Prior"}\NormalTok{)) }\SpecialCharTok{+}
+     \CommentTok{\# geom\_vline(aes(xintercept = 0, colour="mean")) +}
+      \FunctionTok{xlab}\NormalTok{(}\StringTok{"sigma"}\NormalTok{) }\SpecialCharTok{+}
+      \FunctionTok{ylab}\NormalTok{(}\StringTok{"Probability"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{ggtitle}\NormalTok{(}\StringTok{"Temperature 12C and 20C"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{theme\_classic}\NormalTok{()}
+
+\NormalTok{p1 }
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{homework2_files/figure-latex/unnamed-chunk-3-1.pdf}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# plot for the prior of b}
+\NormalTok{p\_grid }\OtherTok{=} \FunctionTok{seq}\NormalTok{(}\SpecialCharTok{{-}}\DecValTok{15}\NormalTok{, }\DecValTok{15}\NormalTok{, }\AttributeTok{len =} \DecValTok{1000}\NormalTok{)}
+\NormalTok{dp }\OtherTok{=}\NormalTok{ p\_grid[}\DecValTok{2}\NormalTok{] }\SpecialCharTok{{-}}\NormalTok{ p\_grid[}\DecValTok{1}\NormalTok{]}
+\NormalTok{prior\_b }\OtherTok{=} \FunctionTok{dnorm}\NormalTok{(p\_grid, }\DecValTok{0}\NormalTok{, }\DecValTok{3}\NormalTok{) }
+\NormalTok{p1 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{p\_grid, }\AttributeTok{y=}\NormalTok{prior\_b}\SpecialCharTok{*}\NormalTok{dp, }\AttributeTok{linetype=}\StringTok{"Prior"}\NormalTok{)) }\SpecialCharTok{+}
+      \FunctionTok{geom\_vline}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{xintercept =} \DecValTok{0}\NormalTok{, }\AttributeTok{colour=}\StringTok{"mean"}\NormalTok{)) }\SpecialCharTok{+}
+      \FunctionTok{xlab}\NormalTok{(}\StringTok{"b (slope)"}\NormalTok{) }\SpecialCharTok{+}
+      \FunctionTok{ylab}\NormalTok{(}\StringTok{"Probability"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{ggtitle}\NormalTok{(}\StringTok{"Temperature 12C and 20C"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{theme\_classic}\NormalTok{()}
+
+\NormalTok{p1 }
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{homework2_files/figure-latex/unnamed-chunk-4-1.pdf}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# plot for the prior of log(a\_\{T\})}
+
+\DocumentationTok{\#\#\# T = 12C}
+
+\CommentTok{\#grid for T = 12C}
+\NormalTok{p\_grid\_12 }\OtherTok{=} \FunctionTok{seq}\NormalTok{(}\FunctionTok{min}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t), }\FunctionTok{max}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t), }\AttributeTok{len=}\DecValTok{100}\NormalTok{)}
+\CommentTok{\#p\_grid\_12 = seq(min(bd\_12$logload\_tplus1), max(bd\_12$logload\_tplus1), len=100)}
+\NormalTok{dp\_12 }\OtherTok{=}\NormalTok{ p\_grid\_12[}\DecValTok{2}\NormalTok{] }\SpecialCharTok{{-}}\NormalTok{ p\_grid\_12[}\DecValTok{1}\NormalTok{]}
+
+\CommentTok{\# Finding mean of logload\_t at T=12}
+\NormalTok{mu\_12 }\OtherTok{=} \FunctionTok{mean}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t)}
+
+\NormalTok{prior\_log\_a\_12 }\OtherTok{=} \FunctionTok{dnorm}\NormalTok{(p\_grid\_12, mu\_12, }\DecValTok{3}\NormalTok{) }
+\NormalTok{p2 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{p\_grid\_12, }\AttributeTok{y=}\NormalTok{prior\_log\_a\_12}\SpecialCharTok{*}\NormalTok{dp\_12, }\AttributeTok{linetype=}\StringTok{"Prior"}\NormalTok{)) }\SpecialCharTok{+}
+      \CommentTok{\#geom\_vline(aes(xintercept = 0, colour="mean")) +}
+      \FunctionTok{xlab}\NormalTok{(}\StringTok{"log(a\_12) (intercept)"}\NormalTok{) }\SpecialCharTok{+}
+      \FunctionTok{ylab}\NormalTok{(}\StringTok{"Probability"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{ggtitle}\NormalTok{(}\StringTok{"Temperature 12C"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{theme\_classic}\NormalTok{()}
+
+
+
+\DocumentationTok{\#\#\# T = 20C}
+
+\CommentTok{\#grid for T = 20C}
+\NormalTok{p\_grid\_20 }\OtherTok{=} \FunctionTok{seq}\NormalTok{(}\FunctionTok{min}\NormalTok{(bd\_20}\SpecialCharTok{$}\NormalTok{logload\_t), }\FunctionTok{max}\NormalTok{(bd\_20}\SpecialCharTok{$}\NormalTok{logload\_t), }\AttributeTok{len=}\DecValTok{100}\NormalTok{)}
+\NormalTok{dp\_20 }\OtherTok{=}\NormalTok{ p\_grid\_20[}\DecValTok{2}\NormalTok{] }\SpecialCharTok{{-}}\NormalTok{ p\_grid\_20[}\DecValTok{1}\NormalTok{]}
+
+\CommentTok{\# Finding mean of logload\_t at T=12}
+\NormalTok{mu\_20 }\OtherTok{=} \FunctionTok{mean}\NormalTok{(bd\_20}\SpecialCharTok{$}\NormalTok{logload\_t) }
+
+\NormalTok{prior\_log\_a\_20 }\OtherTok{=} \FunctionTok{dnorm}\NormalTok{(p\_grid\_20, mu\_20, }\DecValTok{3}\NormalTok{) }
+\NormalTok{p3 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{p\_grid\_20, }\AttributeTok{y=}\NormalTok{prior\_log\_a\_20}\SpecialCharTok{*}\NormalTok{dp\_20, }\AttributeTok{linetype=}\StringTok{"Prior"}\NormalTok{)) }\SpecialCharTok{+}
+      \CommentTok{\#geom\_vline(aes(xintercept = 0, colour="mean")) +}
+      \FunctionTok{xlab}\NormalTok{(}\StringTok{"log(a\_20) (intercept)"}\NormalTok{) }\SpecialCharTok{+}
+      \FunctionTok{ylab}\NormalTok{(}\StringTok{"Probability"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{ggtitle}\NormalTok{(}\StringTok{"Temperature 20C"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{theme\_classic}\NormalTok{()}
+
+\NormalTok{p2}\SpecialCharTok{+}\NormalTok{p3}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{homework2_files/figure-latex/unnamed-chunk-5-1.pdf}}
+
+\textbf{3. Fitting your model}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{library}\NormalTok{(rethinking)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Loading required package: cmdstanr
+\end{verbatim}
+
+\begin{verbatim}
+## This is cmdstanr version 0.8.1
+\end{verbatim}
+
+\begin{verbatim}
+## - CmdStanR documentation and vignettes: mc-stan.org/cmdstanr
+\end{verbatim}
+
+\begin{verbatim}
+## - CmdStan path: /Users/harkins/anaconda3/envs/r_bayesian_stats/bin/cmdstan
+\end{verbatim}
+
+\begin{verbatim}
+## - CmdStan version: 2.35.0
+\end{verbatim}
+
+\begin{verbatim}
+## Loading required package: posterior
+\end{verbatim}
+
+\begin{verbatim}
+## This is posterior version 1.6.0
+\end{verbatim}
+
+\begin{verbatim}
+## 
+## Attaching package: 'posterior'
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:stats':
+## 
+##     mad, sd, var
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:base':
+## 
+##     %in%, match
+\end{verbatim}
+
+\begin{verbatim}
+## Loading required package: parallel
+\end{verbatim}
+
+\begin{verbatim}
+## rethinking (Version 2.40)
+\end{verbatim}
+
+\begin{verbatim}
+## 
+## Attaching package: 'rethinking'
+\end{verbatim}
+
+\begin{verbatim}
+## The following object is masked from 'package:stats':
+## 
+##     rstudent
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# de{-}meaning/scaling}
+\CommentTok{\#bd\_data$scaled\_weight = (bd\_data$logload\_t {-} mean(bd\_data$logload\_t))}
+
+\NormalTok{bd\_12}\SpecialCharTok{$}\NormalTok{scaled\_weight }\OtherTok{=}\NormalTok{ (bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t }\SpecialCharTok{{-}} \FunctionTok{mean}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t))}
+\NormalTok{bd\_20}\SpecialCharTok{$}\NormalTok{scaled\_weight }\OtherTok{=}\NormalTok{ (bd\_20}\SpecialCharTok{$}\NormalTok{logload\_t }\SpecialCharTok{{-}} \FunctionTok{mean}\NormalTok{(bd\_20}\SpecialCharTok{$}\NormalTok{logload\_t))}
+
+\CommentTok{\# fitting the model }
+\NormalTok{fit\_mod\_12 }\OtherTok{=} \FunctionTok{quap}\NormalTok{(}
+             \FunctionTok{alist}\NormalTok{(}
+\NormalTok{                logload\_tplus1 }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dnorm}\NormalTok{(mu, sigma),}
+\NormalTok{                mu }\OtherTok{\textless{}{-}}\NormalTok{ prior\_log\_a\_12 }\SpecialCharTok{+}\NormalTok{ prior\_b}\SpecialCharTok{*}\NormalTok{scaled\_weight,}
+                \CommentTok{\#prior\_log\_a\_12 \textasciitilde{} dnorm(int\_12 , 3),}
+\NormalTok{                prior\_log\_a\_12 }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dnorm}\NormalTok{(mu\_12 , }\DecValTok{3}\NormalTok{),}
+\NormalTok{                prior\_b }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dnorm}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{3}\NormalTok{),}
+\NormalTok{                sigma }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dunif}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{5}\NormalTok{)}
+\NormalTok{             ), }\AttributeTok{data =}\NormalTok{ bd\_12)}
+\FunctionTok{precis}\NormalTok{(fit\_mod\_12, }\AttributeTok{prob=}\FloatTok{0.95}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                     mean         sd      2.5%     97.5%
+## prior_log_a_12 5.2411390 0.19210558 4.8646190 5.6176590
+## prior_b        0.7736835 0.06000606 0.6560738 0.8912933
+## sigma          2.0999340 0.13611842 1.8331468 2.3667212
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# fitting the model }
+\NormalTok{fit\_mod\_20 }\OtherTok{=} \FunctionTok{quap}\NormalTok{(}
+             \FunctionTok{alist}\NormalTok{(}
+\NormalTok{                logload\_tplus1 }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dnorm}\NormalTok{(mu, sigma),}
+\NormalTok{                mu }\OtherTok{\textless{}{-}}\NormalTok{ prior\_log\_a\_20 }\SpecialCharTok{+}\NormalTok{ prior\_b}\SpecialCharTok{*}\NormalTok{scaled\_weight,}
+                \CommentTok{\#prior\_log\_a\_20 \textasciitilde{} dnorm(int\_20 , 3),}
+\NormalTok{                prior\_log\_a\_20 }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dnorm}\NormalTok{(mu\_20 , }\DecValTok{3}\NormalTok{),}
+\NormalTok{                prior\_b }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dnorm}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{3}\NormalTok{),}
+\NormalTok{                sigma }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dunif}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{5}\NormalTok{)}
+\NormalTok{             ), }\AttributeTok{data =}\NormalTok{ bd\_20)}
+
+\FunctionTok{precis}\NormalTok{(fit\_mod\_20, }\AttributeTok{prob=}\FloatTok{0.95}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                     mean         sd      2.5%     97.5%
+## prior_log_a_20 7.4800548 0.16954522 7.1477522 7.8123573
+## prior_b        0.7252126 0.05851366 0.6105279 0.8398972
+## sigma          1.7066349 0.12007838 1.4712856 1.9419842
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Extract the posterior}
+\NormalTok{post\_12 }\OtherTok{=} \FunctionTok{extract.samples}\NormalTok{(fit\_mod\_12, }\AttributeTok{n=}\DecValTok{10000}\NormalTok{)}
+\NormalTok{post\_20 }\OtherTok{=} \FunctionTok{extract.samples}\NormalTok{(fit\_mod\_20, }\AttributeTok{n=}\DecValTok{10000}\NormalTok{)}
+\CommentTok{\#post\_20}
+
+\NormalTok{diff\_log\_a }\OtherTok{=}\NormalTok{ post\_12[,}\DecValTok{1}\NormalTok{]}\SpecialCharTok{{-}}\NormalTok{post\_20[,}\DecValTok{1}\NormalTok{]}
+\FunctionTok{precis}\NormalTok{(diff\_log\_a, }\AttributeTok{prob=}\FloatTok{0.95}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                 mean        sd      2.5%     97.5%  histogram
+## diff_log_a -2.235625 0.2550047 -2.727573 -1.736809 ▁▁▂▅▇▇▃▁▁▁
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{diff\_b }\OtherTok{=}\NormalTok{ post\_12[,}\DecValTok{2}\NormalTok{]}\SpecialCharTok{{-}}\NormalTok{post\_20[,}\DecValTok{2}\NormalTok{]}
+\FunctionTok{precis}\NormalTok{(diff\_b, }\AttributeTok{prob=}\FloatTok{0.95}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##              mean         sd       2.5%     97.5%     histogram
+## diff_b 0.04843795 0.08379339 -0.1171129 0.2119476 ▁▁▁▂▅▇▇▅▂▁▁▁▁
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Compare prior and posterior}
+\CommentTok{\#n = 10000}
+
+\CommentTok{\# Using version 1 of the model}
+\CommentTok{\# ints\_12 = rnorm(n, int\_12 , 3) \# log alpha\_T / intercepts }
+\CommentTok{\# ints\_20 = rnorm(n, int\_20 , 3) \# log alpha\_T / intercepts }
+
+\CommentTok{\# Using version 2 of the model}
+\CommentTok{\#ints\_12 = rnorm(n, mu\_12 , 3) \# log alpha\_T / intercepts }
+\CommentTok{\#ints\_20 = rnorm(n, mu\_20 , 3) \# log alpha\_T / intercepts }
+\CommentTok{\#slopes = rnorm(n, 0, 3) \# b / slopes}
+
+\CommentTok{\# Compare prior and posterior}
+\CommentTok{\# p1 = ggplot() + geom\_density(aes(ints\_12, color=\textquotesingle{}prior\textquotesingle{})) +}
+\CommentTok{\#               geom\_density(aes(post\_12[, 1], color=\textquotesingle{}posterior\textquotesingle{})) + }
+\CommentTok{\#               scale\_color\_manual(values=c("blue", \textquotesingle{}black\textquotesingle{})) +}
+\CommentTok{\#               xlab("log(a\_12) (intercept)") + }
+\CommentTok{\#               ylab("Density") +}
+\CommentTok{\#         ggtitle("Temperature 12C") +}
+\CommentTok{\#               theme\_classic()}
+\CommentTok{\# }
+\CommentTok{\# p2 = ggplot() + geom\_density(aes(ints\_20, color=\textquotesingle{}prior\textquotesingle{})) +}
+\CommentTok{\#               geom\_density(aes(post\_20[, 1], color=\textquotesingle{}posterior\textquotesingle{})) + }
+\CommentTok{\#               scale\_color\_manual(values=c("blue", \textquotesingle{}black\textquotesingle{})) +}
+\CommentTok{\#               xlab("log(a\_20) (intercept)") + }
+\CommentTok{\#               ylab("Density") +}
+\CommentTok{\#         ggtitle("Temperature 20C") +}
+\CommentTok{\#               theme\_classic()}
+\CommentTok{\# }
+\CommentTok{\# }
+\CommentTok{\# p3 = ggplot() + geom\_density(aes(slopes, color="prior")) +}
+\CommentTok{\#               geom\_density(aes(post\_12[, 2], color="posterior")) +}
+\CommentTok{\#               scale\_color\_manual(values=c("blue", \textquotesingle{}black\textquotesingle{})) +}
+\CommentTok{\#               xlab("b (slope)") + }
+\CommentTok{\#               ylab("Density") +}
+\CommentTok{\#               theme\_classic()}
+\CommentTok{\# }
+\CommentTok{\# p1+p2+p3}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Just posterior}
+\NormalTok{p1 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} 
+                \FunctionTok{geom\_density}\NormalTok{(}\FunctionTok{aes}\NormalTok{(post\_12[, }\DecValTok{1}\NormalTok{], }\AttributeTok{color=}\StringTok{\textquotesingle{}posterior\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+} 
+                \FunctionTok{scale\_color\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{"blue"}\NormalTok{, }\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+                \FunctionTok{xlab}\NormalTok{(}\StringTok{"log(a\_12) (intercept)"}\NormalTok{) }\SpecialCharTok{+} 
+                \FunctionTok{ylab}\NormalTok{(}\StringTok{"Density"}\NormalTok{) }\SpecialCharTok{+}
+                \FunctionTok{theme\_classic}\NormalTok{()}
+\NormalTok{p2 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} 
+                \FunctionTok{geom\_density}\NormalTok{(}\FunctionTok{aes}\NormalTok{(post\_20[, }\DecValTok{1}\NormalTok{], }\AttributeTok{color=}\StringTok{\textquotesingle{}posterior\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+} 
+                \FunctionTok{scale\_color\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{"blue"}\NormalTok{, }\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+                \FunctionTok{xlab}\NormalTok{(}\StringTok{"log(a\_20) (intercept)"}\NormalTok{) }\SpecialCharTok{+} 
+                \FunctionTok{ylab}\NormalTok{(}\StringTok{"Density"}\NormalTok{) }\SpecialCharTok{+}
+                \FunctionTok{theme\_classic}\NormalTok{()}
+
+\NormalTok{p3 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+}
+                \FunctionTok{geom\_density}\NormalTok{(}\FunctionTok{aes}\NormalTok{(post\_12[, }\DecValTok{2}\NormalTok{], }\AttributeTok{color=}\StringTok{"posterior"}\NormalTok{)) }\SpecialCharTok{+}
+                \FunctionTok{scale\_color\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{"blue"}\NormalTok{, }\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+                \FunctionTok{xlab}\NormalTok{(}\StringTok{"b(slope) T = 12C"}\NormalTok{) }\SpecialCharTok{+} 
+                \FunctionTok{ylab}\NormalTok{(}\StringTok{"Density"}\NormalTok{) }\SpecialCharTok{+}
+                \FunctionTok{theme\_classic}\NormalTok{()}
+
+\NormalTok{p4 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+}
+                \FunctionTok{geom\_density}\NormalTok{(}\FunctionTok{aes}\NormalTok{(post\_20[, }\DecValTok{2}\NormalTok{], }\AttributeTok{color=}\StringTok{"posterior"}\NormalTok{)) }\SpecialCharTok{+}
+                \FunctionTok{scale\_color\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{"blue"}\NormalTok{, }\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+                \FunctionTok{xlab}\NormalTok{(}\StringTok{"b(slope) T = 20C"}\NormalTok{) }\SpecialCharTok{+} 
+                \FunctionTok{ylab}\NormalTok{(}\StringTok{"Density"}\NormalTok{) }\SpecialCharTok{+}
+                \FunctionTok{theme\_classic}\NormalTok{()}
+\NormalTok{p1}\SpecialCharTok{+}\NormalTok{p2}\SpecialCharTok{+}\NormalTok{p3}\SpecialCharTok{+}\NormalTok{p4}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{homework2_files/figure-latex/unnamed-chunk-7-1.pdf}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# posterior predictions }
+\FunctionTok{library}\NormalTok{(data.table)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## 
+## Attaching package: 'data.table'
+\end{verbatim}
+
+\begin{verbatim}
+## The following objects are masked from 'package:dplyr':
+## 
+##     between, first, last
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{vals }\OtherTok{=} \FunctionTok{seq}\NormalTok{(}\FunctionTok{min}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{scaled\_weight, bd\_20}\SpecialCharTok{$}\NormalTok{scaled\_weight), }\FunctionTok{max}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{scaled\_weight, bd\_20}\SpecialCharTok{$}\NormalTok{scaled\_weight), }\AttributeTok{len=}\DecValTok{50}\NormalTok{)}
+
+\CommentTok{\# For T = 12}
+\NormalTok{lines\_12}\OtherTok{=} \FunctionTok{sapply}\NormalTok{(vals, }\ControlFlowTok{function}\NormalTok{(x) post\_12[}\DecValTok{1}\SpecialCharTok{:}\DecValTok{100}\NormalTok{, }\DecValTok{1}\NormalTok{] }\SpecialCharTok{+}\NormalTok{ x}\SpecialCharTok{*}\NormalTok{post\_12[}\DecValTok{1}\SpecialCharTok{:}\DecValTok{100}\NormalTok{, }\DecValTok{2}\NormalTok{])}
+\NormalTok{lines\_12\_dt }\OtherTok{=} \FunctionTok{data.table}\NormalTok{(}\FunctionTok{data.frame}\NormalTok{(}\FunctionTok{t}\NormalTok{(lines\_12)))}
+\NormalTok{lines\_12\_dt}\SpecialCharTok{$}\NormalTok{scaled\_weight }\OtherTok{=}\NormalTok{ vals}
+\NormalTok{lines\_12\_melt }\OtherTok{=} \FunctionTok{melt}\NormalTok{(lines\_12\_dt, }\AttributeTok{id.vars=}\StringTok{"scaled\_weight"}\NormalTok{)}
+
+\NormalTok{lines\_12\_plt }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{(lines\_12\_melt) }\SpecialCharTok{+} \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{scaled\_weight, }\AttributeTok{y=}\NormalTok{value, }\AttributeTok{group=}\NormalTok{variable), }\AttributeTok{alpha=}\FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+                          \FunctionTok{theme\_classic}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{xlab}\NormalTok{(}\StringTok{"logload\_t"}\NormalTok{) }\SpecialCharTok{+}
+                          \FunctionTok{ylab}\NormalTok{(}\StringTok{"logload\_tplus\_1"}\NormalTok{) }\SpecialCharTok{+}
+              \FunctionTok{ggtitle}\NormalTok{(}\StringTok{"Temperature 12C"}\NormalTok{)}
+
+
+\CommentTok{\# For T = 20}
+\NormalTok{lines\_20}\OtherTok{=} \FunctionTok{sapply}\NormalTok{(vals, }\ControlFlowTok{function}\NormalTok{(x) post\_20[}\DecValTok{1}\SpecialCharTok{:}\DecValTok{100}\NormalTok{, }\DecValTok{1}\NormalTok{] }\SpecialCharTok{+}\NormalTok{ x}\SpecialCharTok{*}\NormalTok{post\_20[}\DecValTok{1}\SpecialCharTok{:}\DecValTok{100}\NormalTok{, }\DecValTok{2}\NormalTok{])}
+\NormalTok{lines\_20\_dt }\OtherTok{=} \FunctionTok{data.table}\NormalTok{(}\FunctionTok{data.frame}\NormalTok{(}\FunctionTok{t}\NormalTok{(lines\_20)))}
+\NormalTok{lines\_20\_dt}\SpecialCharTok{$}\NormalTok{scaled\_weight }\OtherTok{=}\NormalTok{ vals}
+\NormalTok{lines\_20\_melt }\OtherTok{=} \FunctionTok{melt}\NormalTok{(lines\_20\_dt, }\AttributeTok{id.vars=}\StringTok{"scaled\_weight"}\NormalTok{)}
+
+\NormalTok{lines\_20\_plt }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{(lines\_20\_melt) }\SpecialCharTok{+} \FunctionTok{geom\_line}\NormalTok{(}\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{scaled\_weight, }\AttributeTok{y=}\NormalTok{value, }\AttributeTok{group=}\NormalTok{variable), }\AttributeTok{alpha=}\FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+                          \FunctionTok{theme\_classic}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{xlab}\NormalTok{(}\StringTok{"logload\_t"}\NormalTok{) }\SpecialCharTok{+}
+                          \FunctionTok{ylab}\NormalTok{(}\StringTok{"logload\_tplus\_1"}\NormalTok{)}\SpecialCharTok{+}
+              \FunctionTok{ggtitle}\NormalTok{(}\StringTok{"Temperature 20C"}\NormalTok{)}
+
+\NormalTok{lines\_12\_plt }\SpecialCharTok{+}\NormalTok{ lines\_20\_plt}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{homework2_files/figure-latex/unnamed-chunk-8-1.pdf}}
+
+\textbf{4. Viability of Model}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Generate mean predictions}
+
+\CommentTok{\# Step 1: Draw beta0 and beta1}
+\NormalTok{post\_12 }\OtherTok{=} \FunctionTok{extract.samples}\NormalTok{(fit\_mod\_12, }\AttributeTok{n=}\DecValTok{10000}\NormalTok{)}
+\NormalTok{prior\_log\_a\_12 }\OtherTok{=}\NormalTok{ post\_12[, }\DecValTok{1}\NormalTok{]}
+\NormalTok{b }\OtherTok{=}\NormalTok{ post\_12[, }\DecValTok{2}\NormalTok{]}
+\CommentTok{\#sigma = post\_12[, 3]}
+
+\CommentTok{\# Step 2{-}4: For a doe body weight, calculate mean}
+\NormalTok{pllt12 }\OtherTok{=} \FunctionTok{seq}\NormalTok{(}\FunctionTok{min}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t), }\FunctionTok{max}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t), }\AttributeTok{len=}\DecValTok{50}\NormalTok{)}
+\NormalTok{pllt12\_scaled }\OtherTok{=}\NormalTok{ pllt12 }\SpecialCharTok{{-}} \FunctionTok{mean}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t)}
+\NormalTok{llt12\_mean }\OtherTok{=} \FunctionTok{sapply}\NormalTok{(pllt12\_scaled, }\ControlFlowTok{function}\NormalTok{(x) prior\_log\_a\_12 }\SpecialCharTok{+}\NormalTok{ x}\SpecialCharTok{*}\NormalTok{b)}
+
+\CommentTok{\# Step 5. Summarize}
+\NormalTok{median\_llt12 }\OtherTok{=} \FunctionTok{apply}\NormalTok{(llt12\_mean, }\DecValTok{2}\NormalTok{, median)}
+\NormalTok{lowerupper\_pred }\OtherTok{=} \FunctionTok{apply}\NormalTok{(llt12\_mean, }\DecValTok{2}\NormalTok{, }\ControlFlowTok{function}\NormalTok{(x) }\FunctionTok{quantile}\NormalTok{(x, }\FunctionTok{c}\NormalTok{(}\FloatTok{0.025}\NormalTok{, }\FloatTok{0.975}\NormalTok{)))}
+\NormalTok{llt12\_df }\OtherTok{=} \FunctionTok{data.frame}\NormalTok{(}\AttributeTok{med=}\NormalTok{median\_llt12, }
+                     \AttributeTok{lower=}\NormalTok{lowerupper\_pred[}\DecValTok{1}\NormalTok{, ], }
+                     \AttributeTok{upper=}\NormalTok{lowerupper\_pred[}\DecValTok{2}\NormalTok{, ],}
+                     \AttributeTok{logload\_t=}\NormalTok{pllt12)}
+\CommentTok{\# Step 6. Visualize}
+\NormalTok{p1 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{data=}\NormalTok{bd\_12, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{logload\_t, }\AttributeTok{y=}\NormalTok{logload\_tplus1, }\AttributeTok{color=}\StringTok{"Observed"}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{data=}\NormalTok{llt12\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{pllt12, }\AttributeTok{y=}\NormalTok{med, }\AttributeTok{color=}\StringTok{"Mean prediction"}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{geom\_ribbon}\NormalTok{(}\AttributeTok{data=}\NormalTok{llt12\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{pllt12, }\AttributeTok{ymin=}\NormalTok{lower, }\AttributeTok{ymax=}\NormalTok{upper, }\AttributeTok{fill=}\StringTok{"95\% CI}\SpecialCharTok{\textbackslash{}n}\StringTok{around mean"}\NormalTok{),}
+                                         \AttributeTok{alpha=}\FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{scale\_color\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{"blue"}\NormalTok{, }\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}blue\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{theme\_classic}\NormalTok{() }\SpecialCharTok{+}
+           \FunctionTok{xlab}\NormalTok{(}\StringTok{"logload\_t"}\NormalTok{) }\SpecialCharTok{+}
+       \FunctionTok{ylab}\NormalTok{(}\StringTok{"logload\_tplus1"}\NormalTok{) }\SpecialCharTok{+}
+       \FunctionTok{ggtitle}\NormalTok{(}\StringTok{"Temperature 12 C"}\NormalTok{)}
+
+
+\CommentTok{\# p1 = ggplot() + geom\_point(data=bd\_12, aes(x=scaled\_weight, y=logload\_tplus1, color="Observed")) +}
+\CommentTok{\#          geom\_line(data=llt12\_df, aes(x=pllt12\_scaled, y=med, color="Mean prediction")) + }
+\CommentTok{\#          geom\_ribbon(data=llt12\_df, aes(x=pllt12\_scaled, ymin=lower, ymax=upper, fill="95\% CI\textbackslash{}naround mean"), }
+\CommentTok{\#                                        alpha=0.2) +}
+\CommentTok{\#          scale\_color\_manual(values=c("blue", \textquotesingle{}black\textquotesingle{})) +}
+\CommentTok{\#          scale\_fill\_manual(values=c(\textquotesingle{}blue\textquotesingle{})) +}
+\CommentTok{\#          theme\_classic() +}
+\CommentTok{\#          xlab("de{-}meaned logload\_t") + }
+\CommentTok{\#        ylab("logload\_tplus1") +}
+\CommentTok{\#        ggtitle("Temperature 12 C")}
+
+
+\DocumentationTok{\#\#\#\# Repeating the same process for temperature 20C}
+\NormalTok{post\_20 }\OtherTok{=} \FunctionTok{extract.samples}\NormalTok{(fit\_mod\_20, }\AttributeTok{n=}\DecValTok{10000}\NormalTok{)}
+\NormalTok{prior\_log\_a\_20 }\OtherTok{=}\NormalTok{ post\_20[, }\DecValTok{1}\NormalTok{]}
+\NormalTok{b }\OtherTok{=}\NormalTok{ post\_20[, }\DecValTok{2}\NormalTok{]}
+\CommentTok{\#sigma = post\_20[, 3]}
+
+\CommentTok{\# Step 2{-}4: For a doe body weight, calculate mean}
+\NormalTok{pllt20 }\OtherTok{=} \FunctionTok{seq}\NormalTok{(}\FunctionTok{min}\NormalTok{(bd\_20}\SpecialCharTok{$}\NormalTok{logload\_t), }\FunctionTok{max}\NormalTok{(bd\_20}\SpecialCharTok{$}\NormalTok{logload\_t), }\AttributeTok{len=}\DecValTok{50}\NormalTok{)}
+\NormalTok{pllt20\_scaled }\OtherTok{=}\NormalTok{ pllt20 }\SpecialCharTok{{-}} \FunctionTok{mean}\NormalTok{(bd\_20}\SpecialCharTok{$}\NormalTok{logload\_t)}
+\NormalTok{llt20\_mean }\OtherTok{=} \FunctionTok{sapply}\NormalTok{(pllt20\_scaled, }\ControlFlowTok{function}\NormalTok{(x) prior\_log\_a\_20 }\SpecialCharTok{+}\NormalTok{ x}\SpecialCharTok{*}\NormalTok{b)}
+
+\CommentTok{\# Step 5. Summarize}
+\NormalTok{median\_llt20 }\OtherTok{=} \FunctionTok{apply}\NormalTok{(llt20\_mean, }\DecValTok{2}\NormalTok{, median)}
+\NormalTok{lowerupper\_pred }\OtherTok{=} \FunctionTok{apply}\NormalTok{(llt20\_mean, }\DecValTok{2}\NormalTok{, }\ControlFlowTok{function}\NormalTok{(x) }\FunctionTok{quantile}\NormalTok{(x, }\FunctionTok{c}\NormalTok{(}\FloatTok{0.025}\NormalTok{, }\FloatTok{0.975}\NormalTok{)))}
+\NormalTok{llt20\_df }\OtherTok{=} \FunctionTok{data.frame}\NormalTok{(}\AttributeTok{med=}\NormalTok{median\_llt20, }
+                     \AttributeTok{lower=}\NormalTok{lowerupper\_pred[}\DecValTok{1}\NormalTok{, ], }
+                     \AttributeTok{upper=}\NormalTok{lowerupper\_pred[}\DecValTok{2}\NormalTok{, ],}
+                     \AttributeTok{logload\_t=}\NormalTok{pllt12)}
+\CommentTok{\#llt20\_df}
+
+\CommentTok{\# Step 6. Visualize}
+\NormalTok{p2 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{data=}\NormalTok{bd\_20, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{logload\_t, }\AttributeTok{y=}\NormalTok{logload\_tplus1, }\AttributeTok{color=}\StringTok{"Observed"}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{data=}\NormalTok{llt20\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{pllt20, }\AttributeTok{y=}\NormalTok{med, }\AttributeTok{color=}\StringTok{"Mean prediction"}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{geom\_ribbon}\NormalTok{(}\AttributeTok{data=}\NormalTok{llt20\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{pllt20, }\AttributeTok{ymin=}\NormalTok{lower, }\AttributeTok{ymax=}\NormalTok{upper, }\AttributeTok{fill=}\StringTok{"95\% CI}\SpecialCharTok{\textbackslash{}n}\StringTok{around mean"}\NormalTok{),}
+                                         \AttributeTok{alpha=}\FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{scale\_color\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{"blue"}\NormalTok{, }\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}blue\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{theme\_classic}\NormalTok{() }\SpecialCharTok{+}
+           \FunctionTok{xlab}\NormalTok{(}\StringTok{"logload\_t"}\NormalTok{) }\SpecialCharTok{+}
+       \FunctionTok{ylab}\NormalTok{(}\StringTok{"logload\_tplus1"}\NormalTok{) }\SpecialCharTok{+}
+       \FunctionTok{ggtitle}\NormalTok{(}\StringTok{"Temperature 20 C"}\NormalTok{)}
+
+\CommentTok{\# p2 = ggplot() + geom\_point(data=bd\_20, aes(x=scaled\_weight, y=logload\_tplus1, color="Observed")) +}
+\CommentTok{\#          geom\_line(data=llt20\_df, aes(x=pllt20\_scaled, y=med, color="Mean prediction")) + }
+\CommentTok{\#          geom\_ribbon(data=llt20\_df, aes(x=pllt20\_scaled, ymin=lower, ymax=upper, fill="95\% CI\textbackslash{}naround mean"), }
+\CommentTok{\#                                        alpha=0.2) +}
+\CommentTok{\#          scale\_color\_manual(values=c("blue", \textquotesingle{}black\textquotesingle{})) +}
+\CommentTok{\#          scale\_fill\_manual(values=c(\textquotesingle{}blue\textquotesingle{})) +}
+\CommentTok{\#          theme\_classic() +}
+\CommentTok{\#          xlab("de{-}meaned logload\_t") + }
+\CommentTok{\#        ylab("logload\_tplus1") +}
+\CommentTok{\#        ggtitle("Temperature 20 C")}
+
+\NormalTok{p1 }\SpecialCharTok{+}\NormalTok{ p2}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{homework2_files/figure-latex/unnamed-chunk-9-1.pdf}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# Step 1: Draw beta0 and beta1}
+\NormalTok{n }\OtherTok{=} \DecValTok{10000}
+\NormalTok{post\_12 }\OtherTok{=} \FunctionTok{extract.samples}\NormalTok{(fit\_mod\_12, }\AttributeTok{n=}\DecValTok{10000}\NormalTok{)}
+\NormalTok{prior\_log\_a\_12 }\OtherTok{=}\NormalTok{ post\_12[, }\DecValTok{1}\NormalTok{]}
+\NormalTok{b }\OtherTok{=}\NormalTok{ post\_12[, }\DecValTok{2}\NormalTok{]}
+\NormalTok{sigma }\OtherTok{=}\NormalTok{ post\_12[, }\DecValTok{3}\NormalTok{]}
+
+\CommentTok{\# Step 2{-}4: For a doe body weight, calculate mean and draw from normal}
+\NormalTok{llt12\_distribution }\OtherTok{=} \FunctionTok{sapply}\NormalTok{(pllt12\_scaled, }\ControlFlowTok{function}\NormalTok{(x) }\FunctionTok{rnorm}\NormalTok{(n, prior\_log\_a\_12 }\SpecialCharTok{+}\NormalTok{ x}\SpecialCharTok{*}\NormalTok{b, sigma)) }\CommentTok{\# drawing random logload\_tplus1}
+
+\CommentTok{\# Step 5. Summarize}
+\NormalTok{median\_llt12\_dist }\OtherTok{=} \FunctionTok{apply}\NormalTok{(llt12\_distribution, }\DecValTok{2}\NormalTok{, median)}
+\NormalTok{lowerupper\_llt12\_dist }\OtherTok{=} \FunctionTok{apply}\NormalTok{(llt12\_distribution, }\DecValTok{2}\NormalTok{, }\ControlFlowTok{function}\NormalTok{(x) }\FunctionTok{quantile}\NormalTok{(x, }\FunctionTok{c}\NormalTok{(}\FloatTok{0.025}\NormalTok{, }\FloatTok{0.975}\NormalTok{)))}
+\NormalTok{llt12\_dist\_df }\OtherTok{=} \FunctionTok{data.frame}\NormalTok{(}\AttributeTok{med=}\NormalTok{median\_llt12\_dist, }
+                     \AttributeTok{lower=}\NormalTok{lowerupper\_llt12\_dist[}\DecValTok{1}\NormalTok{, ], }
+                     \AttributeTok{upper=}\NormalTok{lowerupper\_llt12\_dist[}\DecValTok{2}\NormalTok{, ],}
+                     \AttributeTok{logload\_t=}\NormalTok{pllt12)}
+
+\NormalTok{p1 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{data=}\NormalTok{bd\_12, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{logload\_t, }\AttributeTok{y=}\NormalTok{logload\_tplus1, }\AttributeTok{color=}\StringTok{"Observed"}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{data=}\NormalTok{llt20\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{pllt12, }\AttributeTok{y=}\NormalTok{med, }\AttributeTok{color=}\StringTok{"Mean prediction"}\NormalTok{)) }\SpecialCharTok{+} 
+           \FunctionTok{geom\_ribbon}\NormalTok{(}\AttributeTok{data=}\NormalTok{llt20\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{pllt12, }\AttributeTok{ymin=}\NormalTok{lower, }\AttributeTok{ymax=}\NormalTok{upper, }\AttributeTok{fill=}\StringTok{"95\% CI}\SpecialCharTok{\textbackslash{}n}\StringTok{around mean"}\NormalTok{), }
+                                         \AttributeTok{alpha=}\FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{geom\_ribbon}\NormalTok{(}\AttributeTok{data=}\NormalTok{llt12\_dist\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{pllt12, }\AttributeTok{ymin=}\NormalTok{lower, }\AttributeTok{ymax=}\NormalTok{upper, }\AttributeTok{fill=}\StringTok{"95\% CI}\SpecialCharTok{\textbackslash{}n}\StringTok{around prediction"}\NormalTok{), }
+                                         \AttributeTok{alpha=}\FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{scale\_color\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{"blue"}\NormalTok{, }\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}blue\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}red\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{theme\_classic}\NormalTok{() }\SpecialCharTok{+}
+           \FunctionTok{xlab}\NormalTok{(}\StringTok{"logload\_t"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{ylab}\NormalTok{(}\StringTok{"logload\_tplus1"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{ggtitle}\NormalTok{(}\StringTok{" Temperature = 12C"}\NormalTok{)}
+
+\CommentTok{\# Repeating these steps for T = 20C }
+\CommentTok{\# Step 1: Draw beta0 and beta1}
+\NormalTok{post\_20 }\OtherTok{=} \FunctionTok{extract.samples}\NormalTok{(fit\_mod\_20, }\AttributeTok{n=}\DecValTok{10000}\NormalTok{)}
+\NormalTok{prior\_log\_a\_20 }\OtherTok{=}\NormalTok{ post\_20[, }\DecValTok{1}\NormalTok{]}
+\NormalTok{b }\OtherTok{=}\NormalTok{ post\_20[, }\DecValTok{2}\NormalTok{]}
+\NormalTok{sigma }\OtherTok{=}\NormalTok{ post\_20[, }\DecValTok{3}\NormalTok{]}
+
+\CommentTok{\# Step 2{-}4: For a doe body weight, calculate mean and draw from normal}
+\NormalTok{llt20\_distribution }\OtherTok{=} \FunctionTok{sapply}\NormalTok{(pllt20\_scaled, }\ControlFlowTok{function}\NormalTok{(x) }\FunctionTok{rnorm}\NormalTok{(n, prior\_log\_a\_20 }\SpecialCharTok{+}\NormalTok{ x}\SpecialCharTok{*}\NormalTok{b, sigma)) }\CommentTok{\# drawing random logload\_tplus1}
+
+\CommentTok{\# Step 5. Summarize}
+\NormalTok{median\_llt20\_dist }\OtherTok{=} \FunctionTok{apply}\NormalTok{(llt20\_distribution, }\DecValTok{2}\NormalTok{, median)}
+\NormalTok{lowerupper\_llt20\_dist }\OtherTok{=} \FunctionTok{apply}\NormalTok{(llt20\_distribution, }\DecValTok{2}\NormalTok{, }\ControlFlowTok{function}\NormalTok{(x) }\FunctionTok{quantile}\NormalTok{(x, }\FunctionTok{c}\NormalTok{(}\FloatTok{0.025}\NormalTok{, }\FloatTok{0.975}\NormalTok{)))}
+\NormalTok{llt20\_dist\_df }\OtherTok{=} \FunctionTok{data.frame}\NormalTok{(}\AttributeTok{med=}\NormalTok{median\_llt20\_dist, }
+                     \AttributeTok{lower=}\NormalTok{lowerupper\_llt20\_dist[}\DecValTok{1}\NormalTok{, ], }
+                     \AttributeTok{upper=}\NormalTok{lowerupper\_llt20\_dist[}\DecValTok{2}\NormalTok{, ],}
+                     \AttributeTok{logload\_t=}\NormalTok{pllt20)}
+
+\NormalTok{p2 }\OtherTok{=} \FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{data=}\NormalTok{bd\_20, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{logload\_t, }\AttributeTok{y=}\NormalTok{logload\_tplus1, }\AttributeTok{color=}\StringTok{"Observed"}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{data=}\NormalTok{llt20\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{pllt20, }\AttributeTok{y=}\NormalTok{med, }\AttributeTok{color=}\StringTok{"Mean prediction"}\NormalTok{)) }\SpecialCharTok{+} 
+           \FunctionTok{geom\_ribbon}\NormalTok{(}\AttributeTok{data=}\NormalTok{llt20\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{pllt20, }\AttributeTok{ymin=}\NormalTok{lower, }\AttributeTok{ymax=}\NormalTok{upper, }\AttributeTok{fill=}\StringTok{"95\% CI}\SpecialCharTok{\textbackslash{}n}\StringTok{around mean"}\NormalTok{), }
+                                         \AttributeTok{alpha=}\FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{geom\_ribbon}\NormalTok{(}\AttributeTok{data=}\NormalTok{llt20\_dist\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{pllt20, }\AttributeTok{ymin=}\NormalTok{lower, }\AttributeTok{ymax=}\NormalTok{upper, }\AttributeTok{fill=}\StringTok{"95\% CI}\SpecialCharTok{\textbackslash{}n}\StringTok{around prediction"}\NormalTok{), }
+                                         \AttributeTok{alpha=}\FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{scale\_color\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{"blue"}\NormalTok{, }\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}blue\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}red\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{theme\_classic}\NormalTok{() }\SpecialCharTok{+}
+           \FunctionTok{xlab}\NormalTok{(}\StringTok{"logload\_t"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{ylab}\NormalTok{(}\StringTok{"logload\_tplus1"}\NormalTok{) }\SpecialCharTok{+} \FunctionTok{ggtitle}\NormalTok{(}\StringTok{" Temperature = 20C"}\NormalTok{)}
+\NormalTok{p1}\SpecialCharTok{+}\NormalTok{p2}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{homework2_files/figure-latex/unnamed-chunk-10-1.pdf}}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{p1}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{homework2_files/figure-latex/unnamed-chunk-10-2.pdf}}
+
+For T = 12C, it appears that the modeling assumption that there is
+heteroscadicity since the observed points vary greatly at lower values
+of logload\_t.
+
+\textbf{Making inference on the models}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Using your fitted model, draw conclusions about three hypothesis
+  relating to differences in Bd growth and load dynamics on frogs at
+  different temperatures.
+\end{enumerate}
+
+\begin{enumerate}
+\def\labelenumi{\alph{enumi}.}
+\tightlist
+\item
+  \(log(a_{12}) = log(a_{20})\)
+\item
+  \(b_{12} = b_{20}\)
+\item
+  \(\theta_{12} = \theta_{20}\)
+\end{enumerate}
+
+When drawing your conclusions, use plots of posterior distributions and
+credible intervals to support your answers.
+
+\begin{enumerate}
+\def\labelenumi{\alph{enumi}.}
+\tightlist
+\item
+  Based on the computation ``precis(diff\_log\_a, prob=0.95)'', we can
+  reject \(log(a_{12}) = log(a_{20})\).
+\item
+  Based on the computation ``precis(diff\_b, prob=0.95)'' we can
+  conclude that it is plausible for \(b_{12} = b_{20}\).
+\end{enumerate}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{theta\_12 }\OtherTok{=}\NormalTok{ post\_12[,}\DecValTok{2}\NormalTok{]}\SpecialCharTok{/}\NormalTok{(}\DecValTok{1}\SpecialCharTok{{-}}\NormalTok{post\_12[,}\DecValTok{1}\NormalTok{])}
+  
+\NormalTok{theta\_20 }\OtherTok{=}\NormalTok{ post\_20[,}\DecValTok{2}\NormalTok{]}\SpecialCharTok{/}\NormalTok{(}\DecValTok{1}\SpecialCharTok{{-}}\NormalTok{post\_20[,}\DecValTok{1}\NormalTok{])}
+  
+\NormalTok{diff\_theta }\OtherTok{=}\NormalTok{ theta\_12 }\SpecialCharTok{{-}}\NormalTok{ theta\_20}
+
+\FunctionTok{precis}\NormalTok{(diff\_theta, }\AttributeTok{prob=}\FloatTok{0.95}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                   mean         sd       2.5%       97.5%       histogram
+## diff_theta -0.07122553 0.01892606 -0.1090816 -0.03494029 ▁▁▁▁▂▃▅▇▇▅▃▁▁▁▁
+\end{verbatim}
+
+\begin{enumerate}
+\def\labelenumi{\alph{enumi}.}
+\setcounter{enumi}{2}
+\tightlist
+\item
+  From the above computation, the values for diff\_theta do not overlap
+  with 0, thus we can conclude that \(\theta_{12} \neq \theta_{20}\).
+\end{enumerate}
+
+\subsection{Question 3}\label{question-3}
+
+Focus on the data from the experiment at 12 C. You may have noticed that
+one of the assumptions of our model was clearly violated -- there is not
+equal variance in log Bd load at time \(t + 1\) across different values
+of log Bd load at time \(t\). In particular, it looks like variance in
+log Bd load at time \(t + 1\) decreases as log Bd load at time \(t\) get
+larger. Failing to account for these differences in variances can
+substantially affect any inference we make about Bd growth dynamics.
+Therefore, we want to model the patterns we see in variance.
+
+For Bayesian analysis, modeling heterogeneity in variance is
+straight-forward. Consider the generic model with predictor variable
+\(x\) and response variable \(y\) and \(i = 1, \dots, n\) observations.
+My Bayesian linear regression without heterogeneity in variance might
+look like
+
+\[
+\begin{aligned}
+y_i &\sim \text{Normal}(\mu_i, \sigma) \\
+\mu_i &= \beta_0 + \beta_1 x_i \\
+\beta_0 &\sim \text{Normal}(0, 3) \\
+\beta_1 &\sim \text{Normal}(0, 3) \\
+\sigma &\sim \text{Exponential}(1)
+\end{aligned}
+\]
+
+Let's now say that the variance in \(y\) clearly changes with \(x\). I
+can update my model by allowing \(\sigma\) to be a function of \(x\)
+(\(f(x)\)).
+
+\[
+\begin{aligned}
+y_i &\sim \text{Normal}(\mu_i, \sigma_i) \\
+\mu_i &= \beta_0 + \beta_1 x_i \\
+\beta_0 &\sim \text{Normal}(0, 3) \\
+\beta_1 &\sim \text{Normal}(0, 3) \\
+\sigma_i &= f(x_i)
+\end{aligned}
+\] So, you can model changes in variance, just like you model changes in
+the mean. However, be careful that \(\sigma\) has a clear lower bound of
+0! So choose your functions appropriately so they don't go below zero
+(alternatively, you could model \(\log(\sigma)\) which would eliminate
+this problem). A common choice is \(\sigma_i = s e^{\alpha_1 x_i}\).
+With this function, if \(x\) is centered (i.e., a mean of 0), then \(s\)
+is the standard deviation in \(y\) when \(x\) is at its mean value.
+\(\alpha_1\) describes how much log \(\sigma\) changes (increases or
+decreases) with an increase in \(x\).
+
+We can then write our model as
+
+\[
+\begin{aligned}
+y_i &\sim \text{Normal}(\mu_i, \sigma_i) \\
+\mu_i &= \beta_0 + \beta_1 x_i \\
+\beta_0 &\sim \text{Normal}(0, 3) \\
+\beta_1 &\sim \text{Normal}(0, 3) \\
+\sigma_i &= s e^{\alpha_1 x_i} \\
+s &\sim \text{Prior} \\
+\alpha_1 &\sim \text{Prior}
+\end{aligned}
+\] where we have one additional parameter to estimate, \(\alpha_1\). I
+am purposefully not specifying the forms of the priors as this is part
+of what you will have to do.
+
+\textbf{Fitting the model}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  Fully write-out the model with non-constant variance for Bd load
+  dynamics on frogs at 12 C (you don't need to do it at 20 C).
+\item
+  Clearly specify what prior distributions you are choosing for your new
+  parameters and why.
+\item
+  Fit the model using \texttt{quap} and answer the question: Does our
+  model support the hypothesis that variance in Bd load at time
+  \(t + 1\) is decreasing with increasing Bd load at time \(t\)? Justify
+  your answer with a plot, point estimate, and credible interval.
+\end{enumerate}
+
+\[
+\begin{aligned}
+log(x(t+1))_T &\sim \text{Normal}(log(\mu_T), \sigma) \\
+log(\mu_T) &= log(a_{T}) + b_{T} [log(x(t))_T - log(\bar{x}_T)] \\
+log(a_{T}) &\sim \text{Normal}(log(\bar{x}_T), 3) \\
+b_{T} &\sim \text{Normal}(0, 3) \\
+\sigma_i &= s e^{\alpha_1 x_i} \\
+s &\sim \text{Exponential(1)} \\
+\alpha_1 &\sim \text{Normal}(0, 3)
+\end{aligned}
+\]
+
+Reasoning for priors:
+
+\(s \sim \text{Exponential}(1)\): This was chosen because the support of
+the Beta distribution is {[}0,1{]}, which enforces the face that we
+require \(\sigma_i\) to be strictly positive as it becomes the variance
+for the likelihood. Note: the probability of s is 0 is measure zero.
+Having \(s \in [0,1]\) will allow us to scale the intensity of the
+exponential factor in the term \(\sigma_i\).
+\(\alpha_1 \sim \text{Normal(0,3)}\): This will allow the exponent to be
+either positive or negative, which does not change the overall sign of
+\(sigma_i\). The other priors are left the same from question 2.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# fitting the model with \textquotesingle{}quap\textquotesingle{} }
+\CommentTok{\#library(invgamma)}
+\NormalTok{fit\_mod\_3 }\OtherTok{=} \FunctionTok{quap}\NormalTok{(}
+             \FunctionTok{alist}\NormalTok{(}
+\NormalTok{                logload\_tplus1 }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dnorm}\NormalTok{(mu, sigma\_i),}
+\NormalTok{                mu }\OtherTok{\textless{}{-}}\NormalTok{ prior\_log\_a\_12 }\SpecialCharTok{+}\NormalTok{ prior\_b}\SpecialCharTok{*}\NormalTok{scaled\_weight,}
+\NormalTok{                prior\_log\_a\_12 }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dnorm}\NormalTok{(mu\_12, }\DecValTok{3}\NormalTok{),}
+\NormalTok{                prior\_b }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dnorm}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{3}\NormalTok{),}
+\NormalTok{                sigma\_i }\OtherTok{\textless{}{-}}\NormalTok{ s}\SpecialCharTok{*}\FunctionTok{exp}\NormalTok{(alpha }\SpecialCharTok{*}\NormalTok{ scaled\_weight), }
+\NormalTok{                alpha }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dnorm}\NormalTok{(}\DecValTok{0}\NormalTok{, }\DecValTok{3}\NormalTok{),}
+\NormalTok{                s }\SpecialCharTok{\textasciitilde{}} \FunctionTok{dexp}\NormalTok{(}\FloatTok{0.5}\NormalTok{)}
+\NormalTok{             ), }\AttributeTok{data =}\NormalTok{ bd\_12)}
+\FunctionTok{precis}\NormalTok{(fit\_mod\_3, }\AttributeTok{prob=}\FloatTok{0.95}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+##                       mean         sd       2.5%       97.5%
+## prior_log_a_12  5.14063664 0.19929350  4.7500286  5.53124472
+## prior_b         0.88599722 0.05451699  0.7791459  0.99284856
+## alpha          -0.09347156 0.02475625 -0.1419929 -0.04495021
+## s               1.98996065 0.12818816  1.7387165  2.24120482
+\end{verbatim}
+
+Does our model support the hypothesis that variance in Bd load at time
+\(t + 1\) is decreasing with increasing Bd load at time \(t\)?\\
+Justify your answer with a plot, point estimate, and credible interval.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# plot}
+\CommentTok{\# Generate mean predictions}
+
+\CommentTok{\# Step 1: Draw beta0 and beta1}
+\NormalTok{post\_Q3 }\OtherTok{=} \FunctionTok{extract.samples}\NormalTok{(fit\_mod\_3, }\AttributeTok{n=}\DecValTok{10000}\NormalTok{)}
+\NormalTok{log\_a }\OtherTok{=}\NormalTok{ post\_Q3[, }\DecValTok{1}\NormalTok{]}
+\NormalTok{b }\OtherTok{=}\NormalTok{ post\_Q3[, }\DecValTok{2}\NormalTok{]}
+\NormalTok{alpha }\OtherTok{=}\NormalTok{ post\_Q3[,}\DecValTok{3}\NormalTok{]}
+\NormalTok{s }\OtherTok{=}\NormalTok{ post\_Q3[, }\DecValTok{4}\NormalTok{]}
+
+
+\CommentTok{\# Step 2{-}4: For a logload\_t, calculate mean}
+\NormalTok{ticks }\OtherTok{=} \FunctionTok{seq}\NormalTok{(}\FunctionTok{min}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t), }\FunctionTok{max}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t), }\AttributeTok{len=}\DecValTok{50}\NormalTok{)}
+\NormalTok{plogload\_t\_Q3\_scaled }\OtherTok{=}\NormalTok{ ticks }\SpecialCharTok{{-}} \FunctionTok{mean}\NormalTok{(bd\_12}\SpecialCharTok{$}\NormalTok{logload\_t)}
+\NormalTok{logload\_t\_Q3\_mean }\OtherTok{=} \FunctionTok{sapply}\NormalTok{(plogload\_t\_Q3\_scaled, }\ControlFlowTok{function}\NormalTok{(x) log\_a }\SpecialCharTok{+}\NormalTok{ x}\SpecialCharTok{*}\NormalTok{b)}
+
+\NormalTok{median\_logload\_t\_Q3 }\OtherTok{=} \FunctionTok{apply}\NormalTok{(logload\_t\_Q3\_mean, }\DecValTok{2}\NormalTok{, median)}
+\NormalTok{lowerupper\_pred }\OtherTok{=} \FunctionTok{apply}\NormalTok{(logload\_t\_Q3\_mean, }\DecValTok{2}\NormalTok{, }\ControlFlowTok{function}\NormalTok{(x) }\FunctionTok{quantile}\NormalTok{(x, }\FunctionTok{c}\NormalTok{(}\FloatTok{0.025}\NormalTok{, }\FloatTok{0.975}\NormalTok{)))}
+\NormalTok{logload\_t\_Q3\_df }\OtherTok{=} \FunctionTok{data.frame}\NormalTok{(}\AttributeTok{med=}\NormalTok{median\_logload\_t\_Q3, }
+                     \AttributeTok{lower=}\NormalTok{lowerupper\_pred[}\DecValTok{1}\NormalTok{, ], }
+                     \AttributeTok{upper=}\NormalTok{lowerupper\_pred[}\DecValTok{2}\NormalTok{, ],}
+                     \AttributeTok{logload\_t=}\NormalTok{ticks)}
+
+\NormalTok{sigma\_i }\OtherTok{=}\NormalTok{ s }\SpecialCharTok{*} \FunctionTok{exp}\NormalTok{(alpha }\SpecialCharTok{*}\NormalTok{ bd\_12}\SpecialCharTok{$}\NormalTok{scaled\_weight)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{verbatim}
+## Warning in alpha * bd_12$scaled_weight: longer object length is not a multiple
+## of shorter object length
+\end{verbatim}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{logload\_t\_Q3\_distribution }\OtherTok{=} \FunctionTok{sapply}\NormalTok{(plogload\_t\_Q3\_scaled, }\ControlFlowTok{function}\NormalTok{(x) }\FunctionTok{rnorm}\NormalTok{(n, log\_a }\SpecialCharTok{+}\NormalTok{ x}\SpecialCharTok{*}\NormalTok{b, sigma\_i))}
+
+\NormalTok{median\_logload\_t\_Q3\_dist }\OtherTok{=} \FunctionTok{apply}\NormalTok{(logload\_t\_Q3\_distribution, }\DecValTok{2}\NormalTok{, median)}
+
+\NormalTok{lowerupper\_logload\_t\_Q3\_dist }\OtherTok{=} \FunctionTok{apply}\NormalTok{(logload\_t\_Q3\_distribution, }\DecValTok{2}\NormalTok{, }\ControlFlowTok{function}\NormalTok{(x) }\FunctionTok{quantile}\NormalTok{(x, }\FunctionTok{c}\NormalTok{(}\FloatTok{0.025}\NormalTok{, }\FloatTok{0.975}\NormalTok{)))}
+\NormalTok{logload\_t\_Q3\_dist\_df }\OtherTok{=} \FunctionTok{data.frame}\NormalTok{(}\AttributeTok{med=}\NormalTok{median\_logload\_t\_Q3\_dist, }
+                     \AttributeTok{lower=}\NormalTok{lowerupper\_logload\_t\_Q3\_dist[}\DecValTok{1}\NormalTok{, ], }
+                     \AttributeTok{upper=}\NormalTok{lowerupper\_logload\_t\_Q3\_dist[}\DecValTok{2}\NormalTok{, ],}
+                     \AttributeTok{logload\_t=}\NormalTok{ticks)}
+
+\FunctionTok{ggplot}\NormalTok{() }\SpecialCharTok{+} \FunctionTok{geom\_point}\NormalTok{(}\AttributeTok{data=}\NormalTok{bd\_12, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{logload\_t, }\AttributeTok{y=}\NormalTok{logload\_tplus1, }\AttributeTok{color=}\StringTok{"Observed"}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{geom\_line}\NormalTok{(}\AttributeTok{data=}\NormalTok{logload\_t\_Q3\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{logload\_t, }\AttributeTok{y=}\NormalTok{med, }\AttributeTok{color=}\StringTok{"Mean prediction"}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{geom\_ribbon}\NormalTok{(}\AttributeTok{data=}\NormalTok{logload\_t\_Q3\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{logload\_t, }\AttributeTok{ymin=}\NormalTok{lower, }\AttributeTok{ymax=}\NormalTok{upper, }\AttributeTok{fill=}\StringTok{"95\% CI}\SpecialCharTok{\textbackslash{}n}\StringTok{around mean"}\NormalTok{), }\AttributeTok{alpha=}\FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+           \FunctionTok{geom\_ribbon}\NormalTok{(}\AttributeTok{data=}\NormalTok{logload\_t\_Q3\_dist\_df, }\FunctionTok{aes}\NormalTok{(}\AttributeTok{x=}\NormalTok{logload\_t, }\AttributeTok{ymin=}\NormalTok{lower, }\AttributeTok{ymax=}\NormalTok{upper, }\AttributeTok{fill=}\StringTok{"95\% CI}\SpecialCharTok{\textbackslash{}n}\StringTok{around prediction"}\NormalTok{), }\AttributeTok{alpha=}\FloatTok{0.2}\NormalTok{) }\SpecialCharTok{+}
+           
+       
+       \FunctionTok{scale\_color\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{"blue"}\NormalTok{, }\StringTok{\textquotesingle{}black\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{scale\_fill\_manual}\NormalTok{(}\AttributeTok{values=}\FunctionTok{c}\NormalTok{(}\StringTok{\textquotesingle{}blue\textquotesingle{}}\NormalTok{, }\StringTok{\textquotesingle{}red\textquotesingle{}}\NormalTok{)) }\SpecialCharTok{+}
+           \FunctionTok{theme\_classic}\NormalTok{() }\SpecialCharTok{+}
+           \FunctionTok{xlab}\NormalTok{(}\StringTok{"logload\_t"}\NormalTok{) }\SpecialCharTok{+}
+       \FunctionTok{ylab}\NormalTok{(}\StringTok{"logload\_tplus1"}\NormalTok{) }\SpecialCharTok{+}
+       \FunctionTok{ggtitle}\NormalTok{(}\StringTok{"Temperature 12 C with changing variance"}\NormalTok{)}
+\end{Highlighting}
+\end{Shaded}
+
+\pandocbounded{\includegraphics[keepaspectratio]{homework2_files/figure-latex/unnamed-chunk-13-1.pdf}}
+
+\subsubsection{Bonus question: Propogating uncertainty to model
+simulation}\label{bonus-question-propogating-uncertainty-to-model-simulation}
+
+Use your model you fit in Question 3 to simulate 1000 predicted
+trajectories of log Bd growth on an individual frog that are 10 time
+steps long, propagating your uncertainty in your parameter estimates
+through your model simulations. Assume that all trajectories start with
+a log Bd load of 0.
+
+To get started, remember that the dynamics of Bd growth on a frog are
+described by
+
+\[
+\log(\mu(t + 1)) = \log(a) + b \log(x(t))
+\] This is just an update equation and, given a starting value (i.e.,
+log Bd load is 0), you can draw a realization of Bd load at the next
+time step. For a given set of parameters, you will want to repeat this
+10 times, draw a new set of parameters, and do it again. Plot the 1000
+trajectories and summarize the uncertainty in the trajectories using
+95\% credible ribbons (see \texttt{geom\_ribbon}).
+
+\end{document}

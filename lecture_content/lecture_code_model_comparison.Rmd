@@ -1,0 +1,668 @@
+---
+title: 'Lecture code: Regularization and model comparison'
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+ Define some helpful functions that we will use 
+
+```{r}
+library(rethinking)
+library(data.table)
+library(ggplot2)
+
+
+bayesian_rsq = function(mod, obs){
+	# Compute the Bayesian R2 for a model
+
+	pred = link(mod, n=10000)
+	all_resid = t(obs - t(pred))
+	resid_var = apply(all_resid, 1, var)
+	mean_var =  apply(pred, 1, var)
+	R2 = mean_var / (mean_var + resid_var)
+	return(R2)
+
+}
+
+lppd_newdata = function(mod, newdata, n=1e4){
+	# Function to compute lppd on new data
+
+	ll <- sim(mod, data=newdata, ll = TRUE)
+	n <- ncol(ll)
+	ns <- nrow(ll)
+	f <- function(i) log_sum_exp(ll[, i]) - log(ns)
+	lppd <- sapply(1:n, f)
+	return(lppd)
+
+}
+
+```
+
+Build four competing models for our svl data
+
+```{r}
+library(rethinking)
+library(data.table)
+
+# Load tadpole data
+svl_data = read.csv("tadpole_svl.csv")
+svl_data_z = as.data.frame(scale(svl_data))
+
+# Fit increasingly complex models
+mod1 = quap(
+		alist(
+			svl ~ dnorm(mu, sigma),
+			mu <- b0 + b1*algae,
+			b0 ~ dnorm(0, 5),
+			b1 ~ dnorm(0, 3),
+			sigma ~ dexp(1)
+			), data=svl_data_z,
+		    start=list(b0=0, b1=0, sigma=1))
+
+mod2 = quap(
+		alist(
+			svl ~ dnorm(mu, sigma),
+			mu <- b0 + b1*algae + b2*nutr + b3*density,
+			b0 ~ dnorm(0, 5),
+			b1 ~ dnorm(0, 3),
+			b2 ~ dnorm(0, 3),
+			b3 ~ dnorm(0, 3),
+			sigma ~ dexp(1)
+			), data=svl_data_z)
+
+mod3 = quap(
+		alist(
+			svl ~ dnorm(mu, sigma),
+			mu <- b0 + b1*algae + b2*nutr + b3*area,
+			b0 ~ dnorm(0, 5),
+			b1 ~ dnorm(0, 3),
+			b2 ~ dnorm(0, 3),
+			b3 ~ dnorm(0, 3),
+			sigma ~ dexp(1)
+			), data=svl_data_z)
+
+mod4 = quap(
+		alist(
+			svl ~ dnorm(mu, sigma),
+			mu <- b0 + b1*algae + b2*nutr + b3*density + b4*area,
+			b0 ~ dnorm(0, 5),
+			b1 ~ dnorm(0, 3),
+			b2 ~ dnorm(0, 3),
+			b3 ~ dnorm(0, 3),
+			b4 ~ dnorm(0, 3),
+			sigma ~ dexp(1)
+			), data=svl_data_z)
+
+
+models = list(mod1, mod2, mod3, mod4)
+
+# Looks at the model R2 values
+R2_values = lapply(models, bayesian_rsq, svl_data_z$svl)
+lapply(R2_values, median)
+
+```
+
+Fit a very complex model
+
+```{r}
+
+
+full_mod = lm(svl ~ density*area*algae*nutr, data=svl_data_z)
+X = model.matrix(full_mod)
+dim(X)
+mod5 = quap(
+			alist(
+				y ~ dnorm(mu, sigma),
+				mu <- beta0 + X %*% b,
+				beta0 ~ dnorm(0, 5),
+				b ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=list(y=svl_data_z$svl,
+							 X=X),
+				start=list(b=rep(0, ncol(X))))
+median(bayesian_rsq(mod5, svl_data_z$svl))
+
+```
+
+Compute lppd
+
+```{r}
+library(ggplot2)
+
+# Compute lppd (log pointwise predictive density) on training data
+models = list(mod1, mod2, mod3, mod4, mod5)
+lppd_vals = sapply(models, lppd, n=1e4)
+lppd_sum = apply(lppd_vals, 2, sum)
+lppd_sum
+```
+
+Plot lppd
+
+```{r}
+df_mod = data.frame(model_nm = c("Model 1\n2 parameters",
+								 "Model 2\n4 parameters",
+								 "Model 3\n4 parameters",
+								 "Model 4\n5 parameters",
+								 "Model 5\n16 parameters"), 
+					training=lppd_sum)
+
+mdf = melt(as.data.table(df_mod), id.var=c("model_nm"), variable.name=c("testing_training"), value.name="lppd")
+ggplot(data=mdf, aes(x=model_nm, y=lppd, group=testing_training)) + 
+					 geom_point() + geom_line() +
+					  theme_classic() +
+					  xlab("Model name") + ylab("lppd on training data")
+#ggsave("lppd_training.pdf", width=5, height=3)
+```
+
+Generate new tadpole data from 10 ponds
+
+```{r}
+library(data.table)
+
+# Generate tadpole data
+set.seed(10)
+n = 25
+nutr = rnorm(n)
+area = rnorm(n)
+algae = rnorm(n, nutr + area)
+density = rnorm(n, -area + algae)
+svl = rnorm(n, -density + 0.5*algae - nutr)
+
+newdata = data.frame(density=10 + 2*density,
+				 nutr=0.002 + 0.0005*nutr,
+				 area=10 + 2*area,
+				 algae=3*algae,
+				 svl=65 + 15*svl)
+
+# Scale the newdata just like the original data
+newdata$svl = (newdata$svl - mean(svl_data$svl)) / sd(svl_data$svl)
+newdata$density = (newdata$density - mean(svl_data$density)) / sd(svl_data$density)
+newdata$nutr= (newdata$nutr - mean(svl_data$nutr)) / sd(svl_data$nutr)
+newdata$area = (newdata$area - mean(svl_data$area)) / sd(svl_data$area)
+newdata$algae = (newdata$algae - mean(svl_data$algae)) / sd(svl_data$algae)
+
+# Generate new design matrix for complex model
+full_mod = lm(svl ~ density*area*algae*nutr, data=newdata)
+newX = model.matrix(full_mod)
+
+# Calculate lppd on testing data
+models = list(mod1, mod2, mod3, mod4, mod5)
+data = list(newdata, newdata, newdata, newdata, list(y=newdata$svl, X=newX))
+lppd_vals = sapply(1:length(models), function(i) lppd_newdata(models[[i]], data[[i]], n=1e4))
+lppd_sum = apply(lppd_vals, 2, sum)
+
+df_mod$testing = lppd_sum
+df_mod_melt = melt(as.data.table(df_mod), id.vars="model_nm", 
+				   variable.name = "testing_training",
+				   value.name = "lppd")
+
+
+ggplot(data=df_mod_melt, aes(x=model_nm, y=lppd, 
+							color=testing_training,
+							group=testing_training)) + 				  geom_point() + geom_line() +
+					  theme_classic() +
+					  xlab("Model name") + ylab("lppd on training and testing data")
+#ggsave("lppd_training_testing.pdf", width=6, height=3)
+
+ggplot(data=df_mod_melt, aes(x=model_nm, y=-2*lppd, 
+							color=testing_training,
+							group=testing_training)) + 				  geom_point() + geom_line() +
+					  theme_classic() +
+					  xlab("Model name") + ylab("deviance on training and testing data")
+#ggsave("deviance_training_testing.pdf", width=6, height=3)
+```
+
+## Regularization: Can we improve the predictive performance of our complex model with regularization?
+
+```{r}
+# Plot different priors
+vals = seq(-8, 8, len=100)
+prior1 = dnorm(vals, mean=0, sd=3)
+prior2 = dnorm(vals, mean=0, sd=1)
+prior3 = dnorm(vals, mean=0, sd=0.5)
+
+ggplot() + geom_line(aes(x=vals, y=prior1, color="N(0, 3)")) +
+		   geom_line(aes(x=vals, y=prior2, color="N(0, 1)")) +	
+		   geom_line(aes(x=vals, y=prior3, color="N(0, 0.5)")) +
+		   scale_color_manual(values=c("blue", "red", "purple")) +
+		   theme_classic() + xlab("Effect size") + ylab("Density")
+
+#ggsave("regularizing_priors.pdf", width=5.5, height=3)
+
+```
+
+Fit different regularized models
+
+```{r}
+full_mod = lm(svl ~ density*area*algae*nutr, data=svl_data_z)
+X = model.matrix(full_mod)
+dim(X) # 16 parameters 
+mod5.1 = quap(
+			alist(
+				y ~ dnorm(mu, sigma),
+				mu <- beta0 + X %*% b,
+				beta0 ~ dnorm(0, 5),
+				b ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=list(y=svl_data_z$svl,
+							 X=X),
+				start=list(b=rep(0, ncol(X))))
+mod5.2 = quap(
+			alist(
+				y ~ dnorm(mu, sigma),
+				mu <- beta0 + X %*% b,
+				beta0 ~ dnorm(0, 5),
+				b ~ dnorm(0, 1),
+				sigma ~ dexp(1)
+				), data=list(y=svl_data_z$svl,
+							 X=X),
+				start=list(b=rep(0, ncol(X))))
+
+mod5.3 = quap(
+			alist(
+				y ~ dnorm(mu, sigma),
+				mu <- beta0 + X %*% b,
+				beta0 ~ dnorm(0, 5),
+				b ~ dnorm(0, 0.5),
+				sigma ~ dexp(1)
+				), data=list(y=svl_data_z$svl,
+							 X=X),
+				start=list(b=rep(0, ncol(X))))
+
+mod5.4 = quap(
+			alist(
+				y ~ dnorm(mu, sigma),
+				mu <- beta0 + X %*% b,
+				beta0 ~ dnorm(0, 5),
+				b ~ dnorm(0, 0.1),
+				sigma ~ dexp(1)
+				), data=list(y=svl_data_z$svl,
+							 X=X),
+				start=list(b=rep(0, ncol(X))))
+
+mod5.5 = quap(
+			alist(
+				y ~ dnorm(mu, sigma),
+				mu <- beta0 + X %*% b,
+				beta0 ~ dnorm(0, 5),
+				b ~ dnorm(0, 0.01),
+				sigma ~ dexp(1)
+				), data=list(y=svl_data_z$svl,
+							 X=X),
+				start=list(b=rep(0, ncol(X))))
+
+# Within sample prediction
+models = list(mod5.1, mod5.2, mod5.3, mod5.4, mod5.5)
+lppd_vals = sapply(models, lppd, n=1e4)
+lppd_sum = apply(lppd_vals, 2, sum)
+
+df_mod = data.frame(model_nm = c("Model 5.1\nN(0, 3)",
+								 "Model 5.2\nN(0, 1)",
+								 "Model 5.3\nN(0, 0.5)",
+								 "Model 5.4\nN(0, 0.1)",
+								 "Model 5.5\nN(0, 0.01)"), 
+					training=lppd_sum)
+
+# Out of sample prediction
+lppd_vals = sapply(1:length(models), function(i) lppd_newdata(models[[i]], list(y=newdata$svl, X=newX), n=1e4))
+lppd_sum = apply(lppd_vals, 2, sum)
+
+df_mod$testing = lppd_sum
+df_mod_melt = melt(as.data.table(df_mod), id.vars="model_nm", 
+				   variable.name = "testing_training",
+				   value.name = "lppd")
+
+ggplot(data=df_mod_melt, aes(x=model_nm, y=-2*lppd, 
+							color=testing_training, 
+							group=testing_training)) +
+					  geom_point() + geom_line() +
+					  theme_classic() +
+					  xlab("Model name") + ylab("deviance on training and testing data")
+
+#ggsave("regularizing_priors_example.pdf", width=6, height=3.5)
+```
+
+## Cross-validation
+
+Cross-validation for model 1
+
+```{r}
+
+n = nrow(svl_data_z)
+n # we have visited (collected data from) n ponds 
+
+# Save cv values
+lppd_cv = array(NA, dim=n)
+
+# Step 4: Repeat
+for(i in 1:n){
+
+	# Step 1: Drop a data point
+	drop_dat = svl_data_z[-i, ] #removes the i-th row of svl_data_z
+
+	# Step 2: Re-fit model
+	tmod = quap(
+			alist(
+				svl ~ dnorm(mu, sigma),
+				mu <- b0 + b1*algae,
+				b0 ~ dnorm(0, 5),
+				b1 ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=drop_dat,
+				start=list(b0=0, b1=0, sigma=1))
+	
+	# Set 3: Get lppd for dropped data point
+	lppd_cv[i] = lppd_newdata(tmod, newdata=svl_data_z[i, ]) 
+	  # newdata is the row that was dropped earlier 
+	  # lppd for the dropped row is saved in the i-th slot of "lppd_cv"
+	
+}
+
+# Step 5: Get lppd_cv
+# This gives the cumulative quantity that tells us how well this model predicting 
+# These values are relative to each other, so this value alone gives no information. 
+mod1_lppd_cv = sum(lppd_cv)
+mod1_lppd_cv # -34.10736
+```
+
+Cross-validation for model 2
+
+```{r}
+
+n = nrow(svl_data_z)
+
+# Save cv values
+lppd_cv_mod2 = array(NA, dim=n)
+
+# Step 4: Repeat
+for(i in 1:n){
+
+	# Step 1: Drop a data point
+	drop_dat = svl_data_z[-i, ]
+
+	# Step 2: Re-fit model
+	tmod = quap(
+			alist(
+				svl ~ dnorm(mu, sigma),
+				mu <- b0 + b1*algae + b2*nutr + b3*density,
+				b0 ~ dnorm(0, 5),
+				b1 ~ dnorm(0, 3),
+				b2 ~ dnorm(0, 3),
+				b3 ~ dnorm(0, 3),
+				sigma ~ dexp(1)
+				), data=drop_dat,
+				start=list(b0=0, b1=0, b2=0, b3=0, sigma=1))
+
+	# Set 3: Get lppd for dropped data point
+	lppd_cv_mod2[i] = lppd_newdata(tmod, newdata=svl_data_z[i, ])
+}
+
+# Step 5: Get lppd_cv
+mod2_lppd_cv = sum(lppd_cv_mod2)
+mod2_lppd_cv # -15.0165
+
+# Conclusion of mod1 versus mod2: Model 2 is better than model 1 at predicting svl out of sample, or equivalently predicting svl in a new pond.
+```
+
+
+Cross-validation for model 3
+
+```{r}
+
+n = nrow(svl_data_z)
+
+# Save cv values
+lppd_cv_mod3 = array(NA, dim=n)
+
+# Step 4: Repeat
+for(i in 1:n){
+
+	# Step 1: Drop a data point
+	drop_dat = svl_data_z[-i, ]
+
+	# Step 2: Re-fit model
+	tmod = quap(
+			alist(
+			svl ~ dnorm(mu, sigma),
+			mu <- b0 + b1*algae + b2*nutr + b3*area,
+			b0 ~ dnorm(0, 5),
+			b1 ~ dnorm(0, 3),
+			b2 ~ dnorm(0, 3),
+			b3 ~ dnorm(0, 3),
+			sigma ~ dexp(1)
+				), data=svl_data_z)
+
+	# Set 3: Get lppd for dropped data point
+	lppd_cv_mod3[i] = lppd_newdata(tmod, newdata=svl_data_z[i, ])
+}
+
+# Step 5: Get lppd_cv
+mod3_lppd_cv = sum(lppd_cv_mod3)
+
+```
+
+Cross-validation for model 4
+
+```{r}
+
+n = nrow(svl_data_z)
+
+# Save cv values
+lppd_cv_mod4 = array(NA, dim=n)
+
+# Step 4: Repeat
+for(i in 1:n){
+
+	# Step 1: Drop a data point
+	drop_dat = svl_data_z[-i, ]
+
+	# Step 2: Re-fit model
+	tmod = quap(
+		alist(
+			svl ~ dnorm(mu, sigma),
+			mu <- b0 + b1*algae + b2*nutr + b3*density + b4*area,
+			b0 ~ dnorm(0, 5),
+			b1 ~ dnorm(0, 3),
+			b2 ~ dnorm(0, 3),
+			b3 ~ dnorm(0, 3),
+			b4 ~ dnorm(0, 3),
+			sigma ~ dexp(1)
+			), data=svl_data_z)
+
+	# Set 3: Get lppd for dropped data point
+	lppd_cv_mod4[i] = lppd_newdata(tmod, newdata=svl_data_z[i, ])
+}
+
+# Step 5: Get lppd_cv
+mod4_lppd_cv = sum(lppd_cv_mod4)
+
+```
+
+Compare PSIS, lppd_cv, lppd_in_sample
+
+```{r}
+
+# Model 1 estimates
+mod1_lppd = sum(lppd(mod1))
+mod1_psis_lppd = PSIS(mod1)$lppd
+mod1_psis = PSIS(mod1)$PSIS
+
+# Model 2 estimates
+mod2_lppd = sum(lppd(mod2))
+mod2_psis_lppd = PSIS(mod2)$lppd
+mod2_psis = PSIS(mod2)$PSIS
+
+# Model 3 estimates
+mod3_lppd = sum(lppd(mod3))
+mod3_psis_lppd = PSIS(mod3)$lppd
+mod3_psis = PSIS(mod3)$PSIS
+
+# Model 3 estimates
+mod4_lppd = sum(lppd(mod4))
+mod4_psis_lppd = PSIS(mod4)$lppd
+mod4_psis = PSIS(mod4)$PSIS
+
+psis_df = data.frame(lppd_in_sample=c(mod1_lppd,
+									  mod2_lppd, 
+									  mod3_lppd,
+									  mod4_lppd),
+				     lppd_cv=c(mod1_lppd_cv,
+				     		   mod2_lppd_cv,
+				     		   mod3_lppd_cv,
+				     		   mod4_lppd_cv),
+				     lppd_psis=c(mod1_psis_lppd,
+				     		    mod2_psis_lppd,
+				     		    mod3_psis_lppd,
+				     		    mod4_psis_lppd),
+				     model_name=c("Model 1\n2 params", "Model 2\n4 params", "Model 3\n4 params", "Model 4\n5 params")
+				     )
+
+psis_df_melt = melt(as.data.table(psis_df), id.vars=c("model_name"), variable.name="method")
+ggplot(psis_df_melt, aes(x=model_name, y=value, group=method, color=method)) +
+				geom_point() + geom_line() + xlab("Model name") + ylab("lppd") + theme_classic()
+
+ggsave("lppd_comparison.pdf", width=5, height=3)
+
+```
+
+Compare models with PSIS
+
+```{r}
+# compare(mod1, mod2, mod3, mod4, func=WAIC)
+compare(mod1, mod2, mod3, mod4, func=PSIS) # orders the comparison by the model lowest PSIS (indicating a better model by that metric)
+```
+
+Check on PSIS warnings and re-compare models
+
+```{r}
+psis_mod2 = PSIS(mod2, pointwise=TRUE)
+ind = psis_mod2[, "k"] < 0.7
+
+# Fit increasingly complex models
+mod1_red = quap(
+		alist(
+			svl ~ dnorm(mu, sigma),
+			mu <- b0 + b1*algae,
+			b0 ~ dnorm(0, 5),
+			b1 ~ dnorm(0, 3),
+			sigma ~ dexp(1)
+			), data=svl_data_z[ind, ],
+		    start=list(b0=0, b1=0, sigma=1))
+
+mod2_red = quap(
+		alist(
+			svl ~ dnorm(mu, sigma),
+			mu <- b0 + b1*algae + b2*nutr + b3*density,
+			b0 ~ dnorm(0, 5),
+			b1 ~ dnorm(0, 3),
+			b2 ~ dnorm(0, 3),
+			b3 ~ dnorm(0, 3),
+			sigma ~ dexp(1)
+			), data=svl_data_z[ind, ])
+
+mod3_red = quap(
+		alist(
+			svl ~ dnorm(mu, sigma),
+			mu <- b0 + b1*algae + b2*nutr + b3*area,
+			b0 ~ dnorm(0, 5),
+			b1 ~ dnorm(0, 3),
+			b2 ~ dnorm(0, 3),
+			b3 ~ dnorm(0, 3),
+			sigma ~ dexp(1)
+			), data=svl_data_z[ind, ])
+
+mod4_red = quap(
+		alist(
+			svl ~ dnorm(mu, sigma),
+			mu <- b0 + b1*algae + b2*nutr + b3*density + b4*area,
+			b0 ~ dnorm(0, 5),
+			b1 ~ dnorm(0, 3),
+			b2 ~ dnorm(0, 3),
+			b3 ~ dnorm(0, 3),
+			b4 ~ dnorm(0, 3),
+			sigma ~ dexp(1)
+			), data=svl_data_z[ind, ])
+
+# Check model comparison...conclusions are robust to dropping
+# high PSIS points so let's proceed
+compare(mod1_red, mod2_red, mod3_red, mod4_red, func=PSIS)
+
+```
+
+AIC example
+
+```{r}
+# Frequentist AIC
+freq_mod1 = lm(svl ~ algae, data=svl_data_z)
+freq_mod2 = lm(svl ~ algae + nutr + density, data=svl_data_z)
+freq_mod3 = lm(svl ~ algae + nutr + area, data=svl_data_z)
+freq_mod4 = lm(svl ~ algae + nutr + area + density, data=svl_data_z)
+
+aic_freq = AIC(freq_mod1, freq_mod2, freq_mod3, freq_mod4)
+
+# Approximate AIC with a Bayesin
+aic_mod1 = -2*(sum(lppd(mod1)) - 3)
+aic_mod2 = -2*(sum(lppd(mod2)) - 5)
+aic_mod3 = -2*(sum(lppd(mod3)) - 5)
+aic_mod4 = -2*(sum(lppd(mod4)) - 6)
+AIC_bayes = c(aic_mod1, aic_mod2, aic_mod3, aic_mod4)
+aic_both = cbind(aic_freq, AIC_bayes)
+aic_both
+
+```
+
+DIC example
+Lower DIC is better. 
+
+```{r}
+
+# Calculate DIC on our models
+dic_mod1 = DIC(mod1)
+dic_mod2 = DIC(mod2)
+dic_mod3 = DIC(mod3)
+dic_mod4 = DIC(mod4)
+dic_df = data.frame(model=c("Model 1", "Model 2", "Model 3", "Model 4"),
+				    DIC=c(as.numeric(dic_mod1), as.numeric(dic_mod2), 
+				    	  as.numeric(dic_mod3), as.numeric(dic_mod4)),
+				    pD=c(attr(dic_mod1, "pD"), attr(dic_mod2, "pD"), 
+				    	 attr(dic_mod3, "pD") , attr(dic_mod4, "pD") ))
+dic_df
+```
+
+WAIC model comparison
+
+```{r}
+
+compare(mod1, mod2, mod3, mod4, func=WAIC)
+
+```
+
+Code to generate tadpole/metamorph data
+
+```{r}
+
+# Generate tadpole data
+set.seed(25)
+n = 25
+nutr = rnorm(n)
+area = rnorm(n)
+algae = rnorm(n, nutr + area)
+density = rnorm(n, -area + algae)
+svl = rnorm(n, -density + 0.5*algae - nutr)
+
+# Scale biologically
+dat = data.frame(density=10 + 2*density,
+				 nutr=0.002 + 0.0005*nutr,
+				 area=10 + 2*area,
+				 algae=3*algae,
+				 svl=65 + 15*svl)
+
+# write.csv(dat, "tadpole_svl.csv", row.names=FALSE)
+
+```
+
+
+
+

@@ -1,0 +1,538 @@
+---
+title: 'Lecture code: GLMs part 1, Binomial GLM'
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+library(ggplot2)
+library(data.table)
+library(rethinking)
+library(dagitty)
+```
+
+# Load the crane data
+
+```{r}
+crane_dat = read.csv("crane_data_long_form.csv")
+crane_dat
+```
+
+# Visualize the data
+
+```{r}
+ggplot(crane_dat, aes(x=year, y=used, group=treatment, color=treatment)) + 
+				geom_point() + geom_line() + theme_classic() +
+				xlab("Year") + ylab("Number of fields used") +
+				theme(legend.position="inside", legend.position.inside=c(0.3, 0.8))
+
+#ggsave("crane_plot.pdf", width=4, height=3)
+```
+
+# Explore the Binomial and Poisson distribution
+
+```{r}
+library(patchwork)
+
+N = 100
+p = 0.01
+num_draws = 1000
+y_binomial1 = rbinom(num_draws, prob=p, size=N)
+y_poisson1 = rpois(num_draws, N*p)
+
+
+p1 = ggplot() + geom_histogram(aes(x=y_binomial1, fill="binomial"), alpha=0.5) + geom_histogram(aes(x=y_poisson1, fill="poisson"), alpha=0.5) + theme_classic() +
+	xlab("Event count") + ggtitle(paste("N = ", N, ", p = ", p))
+
+N = 10
+p = 0.5
+num_draws = 1000
+y_binomial2 = rbinom(num_draws, prob=p, size=N)
+y_poisson2 = rpois(num_draws, N*p)
+
+
+p2 = ggplot() + geom_histogram(aes(x=y_binomial2, fill="binomial"), alpha=0.5) + geom_histogram(aes(x=y_poisson2, fill="poisson"), alpha=0.5) + xlab("Event count") +
+	theme_classic() + ggtitle(paste("N = ", N, ", p = ", p))
+
+p2 + p1
+
+#ggsave("binomial_poisson_compare.pdf", width=8, height=3)
+
+
+```
+
+Prior predictive simulations
+
+```{r}
+
+num = 1000
+year_treatment = rnorm(1000, 0, 5)
+quantile(year_treatment, c(0.025, 0.5, 0.975))
+
+```
+
+Explore logit and probit link functions
+
+```{r}
+
+# Logit link
+p = seq(0.001, 0.999, len=100)
+logitp = log(p / (1 - p))
+plot(p, logitp)
+
+ggplot() + geom_line(aes(y=p, x=logitp)) + theme_classic() +
+		   ylab("p") + xlab("logit(p)")
+ggsave("logit_link.pdf", width=4, height=2.5)
+
+# Probit link 
+probitp = qnorm(p)
+ggplot() + geom_line(aes(y=p, x=probitp)) + theme_classic() +
+		   ylab("p") + xlab("probit(p)")
+ggsave("probit_link.pdf", width=4, height=2.5)
+
+# Plot the together
+ggplot() + geom_line(aes(y=p, x=probitp, color="probit")) + 
+		   geom_line(aes(y=p, x=logitp, color="logit")) +
+		   theme_classic() +
+		   ylab("p") + xlab("probit(p) or logit(p)")
+#ggsave("probit_logit_link.pdf", width=4, height=2.5)
+```
+
+Prior predictive simulations with logit link
+
+```{r}
+num = 1000
+year_treatment = rnorm(num, 0, 5)
+prior_dist = inv_logit(year_treatment) # inv_logit is in the rethinking package
+
+ggplot() + 
+     geom_histogram(aes(x=prior_dist)) + 
+     theme_classic() + 
+     xlab("Probability of using field")
+
+#ggsave("logistic_prior1.pdf", width=4, height=3)
+
+
+num = 1000
+year_treatment = rnorm(num, 0, 1.5)
+prior_dist = inv_logit(year_treatment) # inv_logit is in the rethinking package
+
+ggplot() + 
+     geom_histogram(aes(x=prior_dist)) + 
+     theme_classic() + 
+     xlab("Probability of using field")
+
+#ggsave("logistic_prior2.pdf", width=4, height=3)
+
+
+# Prior difference in difference expectation
+alpha1 = rnorm(num, 0, 1)
+alpha2 = rnorm(num, 0, 1)
+alpha3 = rnorm(num, 0, 1)
+alpha4 = rnorm(num, 0, 1)
+
+diff_in_diff_prior = (alpha4 - alpha3) - (alpha2 - alpha1)
+hist(inv_logit(diff_in_diff_prior))
+
+```
+
+Fit a Binomial GLM with a means model systematic component
+
+```{r}
+#crane_dat
+# Prepare data
+crane_dat$year_treatment = paste0(crane_dat$year, crane_dat$treatment)
+crane_dat$year_treatment_id = coerce_index(as.factor(crane_dat$year_treatment))
+
+# Set-up the rethinking model
+mod1 =  alist(
+		used ~ dbinom(total_fields, p),
+		logit(p) <- alpha[year_treatment_id], # specifying the link 
+		alpha[year_treatment_id] ~ dnorm(0, 5)
+		)
+
+# Only use relevant columns...Stan and rethinking will throw an
+# error if you try to include columns that are characters (strings).
+tdat = crane_dat[, c("used", "total_fields", "year_treatment_id")]
+#tdat
+mod1_fit = ulam(mod1, data=tdat, warmup=500, iter=2000, chains=4)
+
+# Check rhat
+fitted_coeffs = precis(mod1_fit, depth=2)
+fitted_coeffs
+```
+
+Interpreting the alpha coefficients in precis: 
+
+The alphas are the mean of the log odds (it's on the logit scale). 
+
+```{r}
+inv_logit(fitted_coeffs$mean)
+```
+The fourth entry of this output has the highest probability. This corresponds to "year_treatment_id" 4, which corresponds to "year2supplement". 
+
+
+Check chain diagnostics
+
+```{r}
+#pdf("traceplot.pdf", width=6, height=3)
+traceplot(mod1_fit)
+dev.off()
+
+#pdf("trankplot.pdf", width=6, height=3)
+trankplot(mod1_fit)
+dev.off()
+
+```
+
+Convert to model coefficients on the log-odds scale to the probability scale
+
+```{r}
+post = extract.samples(mod1_fit)
+post_prob = as.data.table(inv_logit(post$alpha))
+
+colnames(post_prob) = paste0("alpha", 1:4)
+head(post_prob) # samples from the posterior then converted back to probailities via inv_logit
+
+melt_post_prob = melt(as.data.table(post_prob))
+
+quantile(post_prob$alpha4, c(0.025, 0.5, 0.975))
+# This is the 95% credible interval for the visitation probability in year 2 supplement.
+
+ggplot(melt_post_prob) + geom_density(aes(x=value, fill=variable)) +
+						 theme_classic() + xlab("Probability of use") +
+						 ylab("Posterior density")
+#ggsave("prob_use_posterior.pdf" , width=5, height=3)
+# red: y1 no supp
+# green:y1 supp
+# blue: y2 no supp
+# purple: y2 supp
+```
+
+Compute the difference in differences
+
+```{r}
+diff_in_diff = (post_prob$alpha4 - post_prob$alpha3) - (post_prob$alpha2 - post_prob$alpha1)
+
+quantile(diff_in_diff, c(0.025, 0.5, 0.975))
+
+# 95% credible interval for the difference in the differences between supp and no supp for each year 
+# Refer to color coded key in previous cell 
+```
+
+Check model predictions
+
+```{r}
+mod1_pred = link(mod1_fit) # Returns inverse link scale predictions
+med = apply(mod1_pred, 2, median)
+lower = apply(mod1_pred, 2, quantile, 0.025)
+upper = apply(mod1_pred, 2, quantile, 0.975)
+
+crane_dat$med = med
+crane_dat$lower = lower
+crane_dat$upper = upper
+
+ggplot(crane_dat, aes(x=year, y=used / total_fields, group=treatment, color=treatment)) + 
+				geom_point(pch=18, size=5) + geom_line() +
+				geom_point(aes(x=year, y=med, color="predicted")) +
+				geom_errorbar(aes(x=year, ymin=lower, ymax=upper, color="predicted"), width=0.1, alpha=0.8) +
+				theme_classic() +
+				scale_color_manual(values=c("red", "black", "blue")) +
+				xlab("Year") + ylab("Probability of use") +
+				theme(legend.position="inside", legend.position.inside=c(0.3, 0.8))
+
+#ggsave('obs_pred_binomial.pdf', width=4.5, height=3)
+```
+
+# Interactions
+
+Compare a no-interaction vs. interaction model
+
+```{r}
+
+# Set-up the sum-to-zero constraint design matrix
+X = model.matrix(~year + treatment, data=crane_dat)
+Xdf = data.frame(X)
+colnames(Xdf) = c("inter", "year2", "supplement")
+Xdf$used = crane_dat$used
+Xdf$total_fields = crane_dat$total_fields
+
+# Fit no interaction model
+mod_noint = alist(
+		used ~ dbinom(total_fields, p),
+		logit(p) <- beta0 + beta_y2 * year2 + beta_sup * supplement,
+		beta0 ~ dnorm(0, 5),
+		c(beta_y2, beta_sup) ~ dnorm(0, 5)
+	) 
+
+mod_noint_fit = ulam(mod_noint, data=Xdf, 
+					 warmup=500, iter=2000, chains=4, log_lik=TRUE)
+
+# Get predictions
+mod_noint_pred = logit(link(mod_noint_fit)) # Returns inverse link scale predictions
+med = apply(mod_noint_pred, 2, median)
+lower = apply(mod_noint_pred, 2, quantile, 0.025)
+upper = apply(mod_noint_pred, 2, quantile, 0.975)
+
+crane_dat$med = med
+crane_dat$lower = lower
+crane_dat$upper = upper
+
+ggplot(crane_dat, aes(x=year, y=logit(used / total_fields), group=treatment, color=treatment)) + 
+				geom_point(pch=18, size=5) +
+				geom_point(aes(x=year, y=med, color="predicted")) +
+				geom_line(aes(x=year, y=med, color="predicted")) +
+				theme_classic() +
+				scale_color_manual(values=c("red", "black", "blue")) +
+				xlab("Year") + ylab("logit(Probability of use)") +
+				theme(legend.position="inside", legend.position.inside=c(0.3, 0.8))
+#ggsave("nointeraction_pred.pdf", width=5, height=3)
+
+```
+
+Fit the model with an interaction
+
+```{r}
+
+# Set up the design matrix
+X = model.matrix(~year + treatment + year*treatment, data=crane_dat)
+Xdf = data.frame(X)
+colnames(Xdf) = c("inter", "year2", "supplement", "year2_supplement")
+Xdf$used = crane_dat$used
+Xdf$total_fields = crane_dat$total_fields
+
+# Fit the model
+mod_int = alist(
+		used ~ dbinom(total_fields, p),
+		logit(p) <- beta0 + beta_y2 * year2 + 
+							beta_sup * supplement + 
+							beta_int * year2*supplement, # this is the interaction term 
+		beta0 ~ dnorm(0, 5),
+		c(beta_y2, beta_sup, beta_int) ~ dnorm(0, 5)
+	) 
+
+mod_int_fit = ulam(mod_int, data=Xdf, 
+				   warmup=500, iter=2000, chains=4,
+				   log_lik=TRUE)
+
+# Get predictions on the logit scale
+mod_int_pred = logit(link(mod_int_fit)) # Returns inverse link scale predictions
+med = apply(mod_int_pred, 2, median)
+lower = apply(mod_int_pred, 2, quantile, 0.025)
+upper = apply(mod_int_pred, 2, quantile, 0.975)
+
+crane_dat$med = med
+crane_dat$lower = lower
+crane_dat$upper = upper
+
+ggplot(crane_dat, aes(x=year, y=logit(used / total_fields), group=treatment, color=treatment)) + 
+				geom_point(pch=18, size=5) +
+				geom_point(aes(x=year, y=med, color="predicted")) +
+				geom_line(aes(x=year, y=med, color="predicted")) +
+				theme_classic() +
+				scale_color_manual(values=c("red", "black", "blue")) +
+				xlab("Year") + ylab("logit(Probability of use)") +
+				theme(legend.position="inside", legend.position.inside=c(0.3, 0.8))
+#ggsave("interaction_pred.pdf", width=5, height=3)
+
+
+# Get predictions on the probability scale
+mod_int_pred = link(mod_int_fit) # Returns inverse link scale predictions
+med = apply(mod_int_pred, 2, median)
+lower = apply(mod_int_pred, 2, quantile, 0.025)
+upper = apply(mod_int_pred, 2, quantile, 0.975)
+
+crane_dat$med = med
+crane_dat$lower = lower
+crane_dat$upper = upper
+
+
+ggplot(crane_dat, aes(x=year, y=used / total_fields, group=treatment, color=treatment)) + 
+				geom_point(pch=18, size=5) +
+				geom_point(aes(x=year, y=med, color="predicted")) +
+				geom_line(aes(x=year, y=med, color="predicted")) +
+				geom_errorbar(aes(x=year, ymin=lower, ymax=upper, color="predicted"), width=0.1, alpha=0.8) +
+				theme_classic() +
+				scale_color_manual(values=c("red", "black", "blue")) +
+				xlab("Year") + ylab("Probability of use") +
+				theme(legend.position="inside", legend.position.inside=c(0.3, 0.8))
+
+#ggsave("interaction_pred_prob.pdf", width=4.5, height=3)
+```
+
+Model comparison and interaction analysis
+
+```{r}
+precis(mod_int_fit, prob=0.95)
+compare(mod_noint_fit, mod_int_fit)
+
+# Check the difference in difference
+mod_int_pred = link(mod_int_fit)
+
+# Examine the difference in differences
+diff_in_diff = (mod_int_pred[, 3] - mod_int_pred[, 4]) - (mod_int_pred[, 1] - mod_int_pred[, 2])
+precis(diff_in_diff, prob=0.95)
+
+# For WAIC, to interpret: 
+# look at dWAIC and dSE
+# One will have NA
+# For the one without NA, does dWAIC +/- 2*dSE overlap with zero?
+#   If yes, we cannot effectively distunguish between the predictive superiority of the models.
+#   If no, then top model is predictively superior  
+```
+
+# Write the model as a Bernoulli logistic regression
+
+Step 1: Combine the data
+
+```{r}
+crane_dat = read.csv("crane_data_long_form.csv")
+
+# Expand data for used
+tused = crane_dat[rep(1:nrow(crane_dat), crane_dat$used), ]
+tused$used = 1
+
+# Expand data for unused
+tunused = crane_dat[rep(1:nrow(crane_dat), crane_dat$unused), ]
+tunused$used = 0
+
+# Combine
+crane_dat_new = rbind(tused, tunused)[, c("year", "treatment", "used")]
+```
+
+Set-up and fit the model with Bernoulli Likelihood 
+
+```{r}
+X = model.matrix(~year + treatment + year*treatment, data=crane_dat_new)
+Xdf = data.frame(X)
+colnames(Xdf) = c("inter", "year2", "supplement", "year2_supplement")
+Xdf$used = crane_dat_new$used
+
+mod_bern = alist(
+		used ~ dbern(p),
+		logit(p) <- beta0 + beta_y2 * year2 + 
+							beta_sup * supplement + 
+							beta_int * year2*supplement,
+		beta0 ~ dnorm(0, 5),
+		c(beta_y2, beta_sup, beta_int) ~ dnorm(0, 5)
+	) 
+
+mod_bern_fit = ulam(mod_bern, data=Xdf, 
+				   warmup=500, iter=2000, chains=4,
+				   log_lik=TRUE)
+
+# Compare the two fits
+precis(mod_bern_fit, prob=0.95)
+precis(mod_int_fit, prob=0.95)
+```
+```{r}
+frog_parasite_dat = read.csv("frog_parasites.csv")
+frog_parasite_dat
+```
+
+```{r}
+library(rethinking)
+frog_parasite_dat$survival = 1 - frog_parasite_dat$mortality # adding survival column (survival is 1)
+frog_para_hmc = alist(
+		survival ~ dbern(p),
+		logit(p) <- beta0 + betadose * dose,
+		beta0 ~ dnorm(0, 2),
+		betadose ~ dnorm(0, 2)
+	) 
+mod_frogpara_fit = ulam(frog_para_hmc, data=frog_parasite_dat, 
+				   warmup=500, iter=2000, chains=4)
+precis(mod_frogpara_fit, prob=0.95)
+```
+```{r}
+traceplot(mod_frogpara_fit)
+dev.off()
+
+trankplot(mod_frogpara_fit)
+dev.off()
+```
+
+
+```{r}
+# Finding the dose at which 50% of hosts will die
+
+post = extract.samples(mod_frogpara_fit)
+dose_posterior = post$beta0/-post$betadose
+quantile(dose_posterior, c(0.025, 0.5, 0.95))
+```
+
+
+# Challenge: Parasite-induced mortality
+
+```{r}
+library(rethinking)
+library(ggplot2)
+
+surv_dat = read.csv("frog_parasites.csv")
+ggplot(surv_dat) + geom_point(aes(x=dose, y=1 - mortality)) + 
+                   theme_classic() +
+                   ylab("Survival") + xlab("Parasite dose")
+```
+
+```{r}
+# Fit a logistic regression model
+surv_dat$dose_z = scale(surv_dat$dose) # Standardize dose
+surv_dat$survive = 1 - surv_dat$mortality
+
+surv_mod = alist(
+         survive ~ dbern(p),
+         logit(p) <- beta0 + beta1*dose_z,
+         beta0 ~ dnorm(0, 2),
+         beta1 ~ dnorm(0, 2)
+  )
+
+surv_mod_fit = ulam(surv_mod, data=surv_dat, warmup=500, iter=2000, chains=4)
+```
+The resaon we're using the logit transformation is to map to the real numbers instead of being constrained to integers.
+```{r}
+traceplot(surv_mod_fit)
+trankplot(surv_mod_fit)
+```
+
+```{r}
+precis(surv_mod_fit)
+```
+
+Plot predictions
+
+```{r}
+
+# Generate new predictions
+new_dose = seq(min(surv_dat$dose_z), max(surv_dat$dose_z), len=50)
+newdata = data.frame(dose_z=new_dose)
+pred = link(surv_mod_fit, data=newdata) # generating on the probability scale, not the log odds scale 
+dim(pred)
+
+# Get quantiles
+med = apply(pred, 2, median)
+lower = apply(pred, 2, quantile, 0.025)
+upper = apply(pred, 2, quantile, 0.975)
+
+# Plot
+ggplot() + geom_point(data=surv_dat, aes(x=dose_z*sd(surv_dat$dose) + mean(surv_dat$dose), y=survive)) + 
+           geom_line(aes(x=new_dose*sd(surv_dat$dose) + mean(surv_dat$dose), y=med)) + 
+           geom_ribbon(aes(x=new_dose*sd(surv_dat$dose) + mean(surv_dat$dose), ymin=lower, ymax=upper), alpha=0.5) + xlab("Dose")
+```
+What is the effect of dose on log-odds survival? What is the LD50?
+
+```{r}
+post = extract.samples(surv_mod_fit)
+
+# Convert back to the untransformed scale (the transformation he's referring to is the standardization of the dataset)
+beta1_new = post$beta1 / sd(surv_dat$dose)
+beta0_new = post$beta0  - ((post$beta1*mean(surv_dat$dose)) / sd(surv_dat$dose))
+
+LD50 = beta0_new / -beta1_new
+PI(LD50, prob=0.95)
+median(LD50) 
+
+PI(beta1_new, prob=0.95)
+median(beta1_new) # this result is on the log odds scale 
+```
+An increase in one parasite, decreases the log odds of survival by -0.04.  At a median of 58 parasites, the survival probability of the frogs is 50%. 
+

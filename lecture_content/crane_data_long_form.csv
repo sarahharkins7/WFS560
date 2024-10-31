@@ -1,0 +1,5 @@
+year,treatment,used,unused,total_fields
+year1,supplement,3,12,15
+year1,no_supplement,2,13,15
+year2,supplement,14,1,15
+year2,no_supplement,7,8,15
