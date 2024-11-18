@@ -9,10 +9,10 @@ output: html_document
 
 Researchers are interested in causally understanding the factors that effect the body sizes of urban red foxes (*Vulpes vulpes*) and predicting the weight of foxes in new urban environments. Foxes move in groups on the urban landscape, and you expect that group size can help when acquiring resources on the landscape. Researchers have measured the body weights of 116 individual foxes (`weight`) as well as four other variables
 
-- `group`: The unique group ID of the foxes
-- `groupsize`: The total number of individuals in the foxes group
-- `area`: The area of the groups home range (hectares)
-- `avgfood`: The average amount of resources in the home range
+-   `group`: The unique group ID of the foxes
+-   `groupsize`: The total number of individuals in the foxes group
+-   `area`: The area of the groups home range (hectares)
+-   `avgfood`: The average amount of resources in the home range
 
 The following DAG is the current working hypothesis regarding how the various measured covariates causally relate to each other.
 
@@ -37,21 +37,279 @@ rethinking::drawdag(dag)
 
 Use `ulam` to fit 5 different models with the following systematic components with `weight` as the response variable
 
-- `avgfood + groupsize + area`
-- `avgfood + groupsize`
-- `groupsize + area`
-- `avgfood`
-- `area`
+-   `avgfood + groupsize + area`
+-   `avgfood + groupsize`
+-   `groupsize + area`
+-   `avgfood`
+-   `area`
 
-For each model, use traceplots, trace-rank plots, $R_{hat}$, and `ess_bulk` to confirm whether the Markov chains have converged.  You don't have to comment on every plot.  Just tell me the criteria that you are using to decide whether the plots and statistics are telling you that the model converged.  If a particular plot does not look good, tell me why.  Other than generating a lot of plots, this should be a relatively short written answer (again, please don't comment on every plot/statistic).
+For each model, use traceplots, trace-rank plots, $R_{hat}$, and `ess_bulk` to confirm whether the Markov chains have converged. You don't have to comment on every plot. Just tell me the criteria that you are using to decide whether the plots and statistics are telling you that the model converged. If a particular plot does not look good, tell me why. Other than generating a lot of plots, this should be a relatively short written answer (again, please don't comment on every plot/statistic).
+
+**What we're looking for in the plots and statistics:**
+
+For the traceplots, we're hoping to see "fuzzy caterpillars" with each coeffiecint. For the trankplots, we're hoping to see a jumble of overlapping lines to indicate that the entire space is being explored. For $R_{hat}$, we want our values to be 1. For `ess_bulk`, we want our values to be greater than 400 (100 for each chain).
+
+```{r}
+library(ggplot2)
+fox_dat = read.csv("foxes.csv")
+head(fox_dat)
+
+ggplot(fox_dat) + geom_point(aes(x=avgfood, y=weight)) + theme_classic() + xlab("avg food") + ylab("fox weight")
+
+ggplot(fox_dat) + geom_point(aes(x=groupsize, y=weight)) + theme_classic() + xlab("group size") + ylab("fox weight")
+```
+
+```{r}
+library(ggplot2)
+library(rethinking)
+library(patchwork)
+library(data.table)
+
+# Normalizing the data and converting "group" to index
+fox_dat$avgfood_z = scale(fox_dat$avgfood)
+fox_dat$area_z = scale(fox_dat$area)
+fox_dat$groupsize_z = scale(fox_dat$groupsize)
+fox_dat$group_z = coerce_index(as.factor(fox_dat$group)) 
+```
+
+```{r}
+# Model 1: avgfood + groupsize + area
+mod1 = alist(
+		weight ~ dnorm(mu, sigma),
+		mu <- beta0 + beta1 * avgfood_z + beta2*groupsize_z + beta3 * area_z,
+		
+		beta0 ~ dnorm(4, 1), # weight is response variable and is un-normalized, value of 4 is based on plot of data  
+		c(beta1, beta2, beta3) ~ dnorm(0, 2),
+    sigma ~ exponential(1)
+	)
+stan_data_mod1= fox_dat[, c("weight", "avgfood_z", "groupsize_z", "area_z")]
+fox_mod1_fit = ulam(mod1, data=stan_data_mod1, warmup=500, iter=1500, 
+					 chains=4, log_lik=TRUE, cores=4)
+```
+
+```{r}
+traceplot(fox_mod1_fit)
+trankplot(fox_mod1_fit)
+precis(fox_mod1_fit)
+```
+
+```{r}
+# Model 2: avgfood + groupsize
+mod2 = alist(
+		weight ~ dnorm(mu, sigma),
+		mu <- beta0 + beta1 * avgfood_z + beta2*groupsize_z,
+		
+		beta0 ~ dnorm(4, 1), # weight is response variable and is un-normalized, value of 4 is based on plot of data  
+		c(beta1, beta2) ~ dnorm(0, 2),
+    sigma ~ exponential(1)
+	)
+stan_data_mod2= fox_dat[, c("weight", "avgfood_z", "groupsize_z")]
+fox_mod2_fit = ulam(mod2, data=stan_data_mod2, warmup=500, iter=1500, 
+					 chains=4, log_lik=TRUE, cores=4)
+```
+
+```{r}
+traceplot(fox_mod2_fit)
+trankplot(fox_mod2_fit)
+precis(fox_mod2_fit)
+```
+
+```{r}
+# Model 3: groupsize + area 
+mod3 = alist(
+		weight ~ dnorm(mu, sigma),
+		mu <- beta0 + beta1 * area_z + beta2*groupsize_z,
+		
+		beta0 ~ dnorm(4, 1), # weight is response variable and is un-normalized, value of 4 is based on plot of data  
+		c(beta1, beta2) ~ dnorm(0, 2),
+    sigma ~ exponential(1)
+	)
+stan_data_mod3= fox_dat[, c("weight", "area_z", "groupsize_z")]
+fox_mod3_fit = ulam(mod3, data=stan_data_mod3, warmup=500, iter=1500, 
+					 chains=4, log_lik=TRUE, cores=4)
+```
+
+```{r}
+traceplot(fox_mod3_fit)
+trankplot(fox_mod3_fit)
+precis(fox_mod3_fit)
+```
+
+```{r}
+# Model 4: avgfood
+mod4 = alist(
+		weight ~ dnorm(mu, sigma),
+		mu <- beta0 + beta1 * avgfood_z,
+		
+		beta0 ~ dnorm(4, 1), # weight is response variable and is un-normalized, value of 4 is based on plot of data  
+		beta1 ~ dnorm(0, 2),
+    sigma ~ exponential(1)
+	)
+stan_data_mod4= fox_dat[, c("weight", "avgfood_z")]
+fox_mod4_fit = ulam(mod4, data=stan_data_mod4, warmup=500, iter=1500, 
+					 chains=4, log_lik=TRUE, cores=4)
+```
+
+```{r}
+traceplot(fox_mod4_fit)
+trankplot(fox_mod4_fit)
+precis(fox_mod4_fit)
+```
+
+```{r}
+# Model 5: area
+mod5 = alist(
+		weight ~ dnorm(mu, sigma),
+		mu <- beta0 + beta1 * area_z,
+		
+		beta0 ~ dnorm(4, 1), # weight is response variable and is un-normalized, value of 4 is based on plot of data  
+		beta1 ~ dnorm(0, 2),
+    sigma ~ exponential(1)
+	)
+stan_data_mod5= fox_dat[, c("weight", "area_z")]
+fox_mod5_fit = ulam(mod5, data=stan_data_mod5, warmup=500, iter=1500, 
+					 chains=4,log_lik=TRUE, cores=4)
+```
+
+```{r}
+traceplot(fox_mod5_fit)
+trankplot(fox_mod5_fit)
+precis(fox_mod5_fit)
+```
+
 
 ## Question 2: Model comparison
 
+
+```{r}
+compare(fox_mod1_fit, fox_mod2_fit, fox_mod3_fit, fox_mod4_fit, fox_mod5_fit, func=PSIS)
+```
+```{r}
+compare(fox_mod1_fit, fox_mod2_fit, fox_mod3_fit, fox_mod4_fit, fox_mod5_fit, func=WAIC)
+```
+
 Use WAIC or PSIS to compare the 5 models and answer the following questions
 
-1. Explain the differences in the WAIC or PSIS values among models based on the DAG given above.  Specifically focus on dWAIC or dPSIS, but ignore dSE for this answer.  Why are these values different based on the DAG?
-2. Which model(s) are predictively superior? Answer this question using two different quantitative criteria discussed in class and discuss whether or not they agree on which models are predictively superior. If they don't agree, why not and which criteria do you prefer?
+1.  Explain the differences in the WAIC or PSIS values among models based on the DAG given above. Specifically focus on dWAIC or dPSIS, but ignore dSE for this answer. Why are these values different based on the DAG?
+
+**Answer to Q2 #1**
+
+Considering the DAG, models 4 and 5 only consider one of the available covariates (average food and area, respectively). Since models 1, 2, and 3 consider multiple covariates and are predicatively superior, using this metric, we suppose that an interaction of multiple covariates is required to more appropriately predict fox weight. Specifically, models 4 and 5 fail to include `groupsize`. We can conclude that `groupsize` is important for making good predictions of fox weight. 
+
+2.  Which model(s) are predictively superior? Answer this question using two different quantitative criteria discussed in class and discuss whether or not they agree on which models are predictively superior. If they don't agree, why not and which criteria do you prefer?
+
+**Answer to Q2 #2**
+
+If we consider the differences in the models using PSIS ignoring dSE, we see that models 1, 2, and 3 are predicatively similar since dPSIS < 0.5. Models 4 and 5 are predicatively inferior to models 1, 2, and 3 since dPSIS > 8. 
+
+Considering the interval generated by $\text{dPSIS} \pm 2 \text{dSE}$, we get the following values for each of the models:
+
+model 1: NA
+model 2: [-7.36, 7.56]
+model 3: [-7.06, 8.06]
+model 4: [-5.68, 26.48]
+model 5: [-5.56, 26.76]
+
+Since all of these intervals contain zero, we can conclude that models 2 - 5 are indistinguishable from model 1, so we cannot claim that the models are predicatively superior. This result differs from the result using only dPSIS.
+
+I prefer using the interval $\text{dPSIS} \pm 2 \text{dSE}$ to compare predicatively superiority. This metric considers uncertainty which is a nice benefit to Bayesian statistics, so we may as well use it.  
+
+
+
+```{r}
+# Calculations of the above intervals 
+## Model 2
+0.1 + 2*3.73
+0.1 - 2*3.73
+
+## Model 3
+0.5 + 2*3.78
+0.5 - 2*3.78
+
+## Model 4
+10.4 +2*8.04
+10.4 -2*8.04
+
+## Model 5
+10.6 + 2* 8.08
+10.6 - 2* 8.08
+
+```
+
+
 
 ## Question 3: Drawing inference
 
-Use your causal and predictive inference to tell me a statistically justified, biological story about the factors affecting fox weight.  Include uncertainty in your story.
+
+Use your causal and predictive inference to tell me a statistically justified, biological story about the factors affecting fox weight. Include uncertainty in your story.
+
+
+**Answer to Q3**
+
+
+```{r}
+# Considering model 1 with avgfood, groupsize, and area 
+# beta1:avgfood
+# beta2: groupsize
+# beta3: area
+post = extract.samples(fox_mod1_fit)
+beta1_natural = post$beta1 /sd(fox_dat$avgfood)
+beta2_natural = post$beta2 /sd(fox_dat$groupsize)
+beta3_natural = post$beta3 /sd(fox_dat$area)
+
+quantile(post$beta1, c(0.025, 0.5, 0.975))
+quantile(post$beta2, c(0.025, 0.5, 0.975))
+quantile(post$beta3, c(0.025, 0.5, 0.975))
+```
+From model 1, we can interpret the influence of average food abundance, group size, and area on fox weight. 
+Increasing the average food  by one unit ~generally~ increases the fox's weight by ≈0.48 (lbs or kg). Since 0 is in the 95% credible interval, we cannot say that this relationship is always positive, but we have strong evidence to suggest that. 
+
+Increasing the group size by 1 unit decreases the fox's weight by ≈0.92 (lbs or kg). The makes biological sense because higher group size can cause higher competition for food, leading to the fox receiving less nutrition. 
+
+Increasing the area by one unit ~generally~ increases the fox's weight by ≈0.36 (lbs or kg). Since 0 is in the 95% credible interval, we cannot say that this relationship is always positive, but we have strong evidence to suggest that. 
+
+# --------------------------------------------------------------------------------------------------------
+```{r}
+# Considering model 2 with avgfood, groupsize
+# beta1:avgfood
+# beta2: groupsize
+
+post2 = extract.samples(fox_mod2_fit)
+beta1_natural = post2$beta1 /sd(fox_dat$avgfood)
+beta2_natural = post2$beta2 /sd(fox_dat$groupsize)
+
+quantile(post2$beta1, c(0.025, 0.5, 0.975))
+quantile(post2$beta2, c(0.025, 0.5, 0.975))
+```
+
+```{r}
+# Considering model 3 
+post3 = extract.samples(fox_mod3_fit)
+beta1_natural = post3$beta1 /sd(fox_dat$area)
+beta2_natural = post3$beta2 /sd(fox_dat$groupsize)
+
+quantile(post3$beta1, c(0.025, 0.5, 0.975))
+quantile(post3$beta2, c(0.025, 0.5, 0.975))
+```
+
+
+```{r}
+# Considering model 4 
+post4 = extract.samples(fox_mod4_fit)
+beta1_natural = post4$beta1 /sd(fox_dat$avgfood)
+
+quantile(post4$beta1, c(0.025, 0.5, 0.975))
+```
+
+
+```{r}
+# Considering model 5 
+post5 = extract.samples(fox_mod5_fit)
+beta1_natural = post5$beta1 /sd(fox_dat$area)
+
+quantile(post5$beta1, c(0.025, 0.5, 0.975))
+```
+
+
+
+

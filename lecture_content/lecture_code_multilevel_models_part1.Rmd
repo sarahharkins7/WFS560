@@ -17,6 +17,7 @@ library(patchwork)
 ```{r}
 gt_dat = read.csv("great_tit_abundance.csv")
 head(gt_dat[order(gt_dat$location), ])
+
 ```
 
 Plot the data
@@ -30,18 +31,18 @@ g1 + g2 + g3
 ggsave("great_tit_data.pdf", width=7, height=3)
 
 
-pdf("barplot.pdf", width=4, height=4)
+# pdf("barplot.pdf", width=4, height=4)
 barplot(table((table(gt_dat$location))), xlab="Number of surveys per location", ylab="count")
 dev.off()
 ```
-# Simulate porcupine data
+# Simulate porcupine data - in this ex., the # of clusters = # of individuals 
 
 ```{r}
-weeks = 0:10
+weeks = 0:10 
 
 # Get initial weights
 set.seed(10)
-n = 6 # Number of individuals
+n = 6 # Number of individuals (number of clusters)
 mean_size = 4 # Mean size of baby porcupine
 sigma_size = 1.5 # Population variability
 init_size = rnorm(n, mean_size, sigma_size) # Random effects
@@ -64,13 +65,45 @@ ggplot(pdat, aes(x=week, y=weight_lb, color=individual)) +
  				ylab("weight (lb)")
 
 
-ggsave("porcupine_growth.pdf", width=5, height=3)
+# ggsave("porcupine_growth.pdf", width=5, height=3)
 ```
 
+# Write models to represent complete pooling, partial pooling, and no pooling:
+
+Complete Pooling
+
+$$
+weight \sim dnorm(\mu, \sigma)\\
+\mu = \beta_{0} + \beta_{1}*week\\
+\beta_{0} \sim \text{Prior}\\
+\beta_{1} \sim \text{Prior}\\
+\sigma_{i} \sim \text{Prior}
+$$
+
+
+Partial Pooling
+$$
+weight \sim dnorm(\mu, \sigma)\\
+\mu = \beta_{0} + \alpha_{1,i} + \beta_{1}*week\\
+\beta_{0} \sim \text{Prior}\\
+\beta_{1} \sim \text{Prior}\\
+\sigma \sim \text{Prior}\\
+\alpha_{i} \sim \text{dnorm}(0, \sigma_{i})\\
+\sigma_{i} \sim \text{Prior}
+$$
+
+No Pooling 
+$$
+weight \sim dnorm(\mu, \sigma)\\
+\mu_{j} = \beta_{0,j} + \beta_{1,j}*week\\
+\beta_{0,j} \sim \text{Prior for each j=1,...,n}\\
+\beta_{1,j} \sim \text{Prior}\\
+\sigma \sim \text{Prior}\\
+$$
 # Fit hierarchical porcupine models
 
 ```{r}
-
+# Partial Pooling Model 
 
 pmod1 = alist(
 		weight_lb ~ dnorm(mu, sigma),
@@ -85,6 +118,7 @@ pmod1 = alist(
 pdat$individual_id = coerce_index(as.factor(pdat$individual))
 stan_data = pdat[, c("individual_id", "weight_lb", "week" )]
 pmod_fit1 = ulam(pmod1, data=stan_data, iter=2000, warmup=1000, chains=4, cores=4)
+precis(pmod_fit1)
 ```
 
 Fit a no pooling, porcupine model with frequentist approach
@@ -96,6 +130,7 @@ freq_fit
 
 Look at shrinkage of predictions
 
+The partial pooling model tends to be closer to the grand mean accross all porcupines because of the regularizing priors 
 ```{r}
 # Generate predictions for each site for hierarchical model
 post1 = extract.samples(pmod_fit1)
@@ -118,7 +153,7 @@ ggplot() + geom_point(aes(x=ind,
 		   geom_hline(aes(yintercept=mean(beta0)), linetype="dashed") + theme_classic() + xlab("Individual ID") +
 		   ylab("Weight at week 0")
 
-ggsave("compare_partial_and_no_pooling_porcupine.pdf", width=5, height=3)
+#ggsave("compare_partial_and_no_pooling_porcupine.pdf", width=5, height=3)
 ```
 
 Drop some porcupine data points to examine shrinkage
@@ -160,7 +195,7 @@ ggplot() + geom_point(aes(x=ind,
 		   geom_hline(aes(yintercept=mean(beta0)), linetype="dashed") + theme_classic() + xlab("Individual ID") +
 		   ylab("Weight at week 0")
 
-ggsave("compare_partial_and_no_pooling_porcupine2.pdf", width=5, height=3)
+# ggsave("compare_partial_and_no_pooling_porcupine2.pdf", width=5, height=3)
 
 ```
 
@@ -188,7 +223,7 @@ colnames(alpha_dt) = c("id", "individual", "value")
 ggplot(alpha_dt) + geom_density(aes(x=value, fill=individual)) + theme_classic() +
 				   xlab("Initial weight (lbs)")
 
-ggsave("ranefs_porcupine.pdf", width=6, height=3)
+# ggsave("ranefs_porcupine.pdf", width=6, height=3)
 ```
 
 ## Predicting observed porcupines
@@ -215,7 +250,7 @@ ggplot(pdat) +
  				theme_classic() + xlab("weeks") +
  				ylab("weight (lb)")
 
-ggsave("mean_predictions_porcupine.pdf", width=5, height=3)
+#ggsave("mean_predictions_porcupine.pdf", width=5, height=3)
 ```
 
 ## Predicting new porcupines distributions
@@ -237,7 +272,7 @@ curves_dt
 # Plot
 ggplot(curves_dt) + geom_line(aes(x=body_size, y=value, group=curve), alpha=0.5) + theme_classic() +
 					ylab("Density") + xlab("Initial body weight")
-ggsave("normal_curves.pdf", width=4, height=3)
+#ggsave("normal_curves.pdf", width=4, height=3)
 
 ```
 
@@ -268,7 +303,7 @@ ggplot(pdat) +
  				theme_classic() + xlab("weeks") +
  				ylab("weight (lb)")
 
- ggsave(paste0("new_porcupine_pred_", i, ".pdf"), width=4, height=3)
+ #ggsave(paste0("new_porcupine_pred_", i, ".pdf"), width=4, height=3)
 
 ```
 
@@ -305,11 +340,14 @@ ggplot(pdat) +
  				theme_classic() + xlab("weeks") +
  				ylab("weight (lb)")
 
- ggsave(paste0("new_porcupine_pred_all.pdf"), width=5, height=3)
+ #ggsave(paste0("new_porcupine_pred_all.pdf"), width=5, height=3)
 
 ```
 
 ## Peaking under the hood
+```{r}
+stancode(pmod_fit1)
+```
 
 Non-centered parameterization using Stan
 
@@ -369,7 +407,7 @@ pmod_nc_fit = pmod_nc$sample(data=stan_data,
                        		 chains=4,
                        		 iter_warmup=500,
                        		 iter_sampling=1000,
-                       		 parallel_chains=4)
+                       		 parallel_chains=1)
 ```
 
 Check that the inference is the same!
@@ -377,6 +415,19 @@ Check that the inference is the same!
 ```{r}
 pmod_nc_fit$summary()
 precis(pmod_fit1, depth=2)
+```
+
+
+```{r}
+
+## extra code block from Mark that wasn't in original download
+
+#extract posterior
+
+
+
+
+
 ```
 
 # Back to the great tit data
@@ -405,6 +456,10 @@ mod1_fit = ulam(mod1, data=stan_data, iter=2000,
 				warmup=500, chains=4, cores=4, log_lik=TRUE)
 
 precis(mod1_fit)
+
+# To display location effects (alpha[location_id])
+#precis(mod1_fit, depth = 2)
+
 ```
 
 Fit no pooling model...use a frequentist approach for comparison with no regularization
@@ -413,6 +468,7 @@ Fit no pooling model...use a frequentist approach for comparison with no regular
 fit_nopool = glm(count ~ as.factor(location) + forest_z + elevation_z +
 						  forest_z*elevation_z + wind_z - 1, 
 						  family="poisson", data=gt_dat)
+fit_nopool
 ```
 
 Here is Bayesian model with some regularization which helps the fitting
@@ -469,7 +525,7 @@ ggplot() + geom_point(aes(x=ind,
 		   geom_hline(aes(yintercept=mean(exp(beta1))), linetype="dashed") + theme_classic() + xlab("Location number") +
 		   ylab("Expected bird abundance")
 
-ggsave("compare_partial_and_no_pooling.pdf", width=5, height=3)
+#ggsave("compare_partial_and_no_pooling.pdf", width=5, height=3)
 
 ```
 
@@ -478,7 +534,7 @@ Test normality of the random effects
 ```{r}
 alpha_mean = colMeans(alpha)
 
-pdf("qqplot.pdf", width=4, height=4)
+#pdf("qqplot.pdf", width=4, height=4)
 qqnorm(alpha_mean)
 qqline(alpha_mean)
 dev.off()
@@ -534,15 +590,15 @@ loo::loo_compare(loo1, loo2)
 Look at model predictions (alternative approach to postcheck)
 
 ```{r}
-mod1_pred = link(mod1_fit) # Get predictions
-mpv =  as.vector(mod1_pred)
+mod1_pred = link(mod1_fit) # Get predictions (outputs the systematic component )
+mpv =  as.vector(mod1_pred) 
 mod1_pred_counts = array(rpois(length(mpv), mpv), dim=dim(mod1_pred)) # Draw poisson samples
 
 p1 = bayesplot::ppc_dens_overlay(y=log(gt_dat$count + 1), 
 								 yrep=log(mod1_pred_counts[1:500, ] + 1))
 
 p1 + theme_classic() + xlab("log(bird counts + 1)") + ylab("Density")
-ggsave("obs_pred_predictions_ranef.pdf", width=4, height=3)
+#ggsave("obs_pred_predictions_ranef.pdf", width=4, height=3)
 ```
 
 ```{r}
@@ -554,10 +610,18 @@ p1 = bayesplot::ppc_dens_overlay(y=log(gt_dat$count + 1),
 								 yrep=log(mod2_pred_counts[1:500, ] + 1))
 
 p1 + theme_classic() + xlab("log(bird counts + 1)") + ylab("Density")
-ggsave("obs_pred_predictions_nopool.pdf", width=4, height=3)
+#ggsave("obs_pred_predictions_nopool.pdf", width=4, height=3)
 ```
 
 # Challenge problems and interactions
+
+#1
+```{r}
+precis(mod1_fit, prob=0.95)
+```
+
+Since beta_wind is in the interval [-1.59, -1.41], we conclude that we are less likely to detect great tits given higher wind speed. 
+
 
 ```{r}
 # Look at wind speed effect
@@ -572,9 +636,13 @@ Get the marginal forest cover effects
 forest_cover = seq(min(gt_dat$forest_z), max(gt_dat$forest_z), len=50)
 newdata = data.frame(forest_z=forest_cover, 
 					 wind_z=mean(gt_dat$wind_z),
-					 elevation_z=mean(gt_dat$wind_z),
+					 elevation_z=mean(gt_dat$elevation_z),
 					 location_id=1) # Using rethinking is a little annoying because you have to choose a location
-fpred = log(link(mod1_fit, data=newdata))
+
+# What does new dataset look like:
+head(newdata)
+fpred = log(link(mod1_fit, data=newdata)) # link returns on the response scale, take log to put back on log scale that we are considering in our model design
+
 med = apply(fpred, 2, median)
 lower = apply(fpred, 2, quantile, 0.025)
 upper = apply(fpred, 2, quantile, 0.975)
@@ -584,7 +652,7 @@ newdata$upper = upper
 
 pf = ggplot(newdata) + geom_line(aes(x=forest_z, y=exp(med))) +
 				  geom_ribbon(aes(x=forest_z, ymin=exp(lower), ymax=exp(upper)), alpha=0.2) + theme_classic() + xlab("Forest cover (z)") + ylab("Expected count")
-
+pf
 ```
 
 Get the marginal elevation effect
@@ -607,7 +675,7 @@ pe = ggplot(newdata) + geom_line(aes(x=elevation_z, y=exp(med))) +
 				  geom_ribbon(aes(x=elevation_z, ymin=exp(lower), ymax=exp(upper)), alpha=0.2) + theme_classic() + xlab("Elevation (z)") + ylab("Expected count")
 
 pe + pf
-ggsave("marginal_effects.pdf", width=6, height=3)
+#ggsave("marginal_effects.pdf", width=6, height=3)
 ```
 
 Calculate the interaction 
@@ -628,7 +696,8 @@ colnames(grid)
 
 # Get mean prediction
 coefs = precis(mod1_fit, pars=c("beta_elevation", "beta_forest", "beta_wind", "beta_fe", "beta1"))$mean
-coefs[4] = 3
+coefs
+# coefs[4] = 3
 
 # Expected effects
 grid$pred = as.matrix(grid) %*% coefs
@@ -636,7 +705,7 @@ grid$pred = as.matrix(grid) %*% coefs
 ggplot(grid, aes(x=elevation, y=forest_cover, z=exp(pred))) + geom_contour() +
 			   geom_contour_filled() +
 			   theme_bw()
-ggsave("interaction.pdf", width=5, height=3)
+#ggsave("interaction.pdf", width=5, height=3)
 
 
 ```

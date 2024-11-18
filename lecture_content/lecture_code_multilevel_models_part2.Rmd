@@ -1,0 +1,383 @@
+---
+title: "Hierarchical Models: Part II"
+author: "Mark Wilber"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(rethinking)
+library(patchwork)
+library(MASS)
+```
+
+# Simulate porcupine data with varying slopes
+
+```{r}
+weeks = 0:10
+
+# Get initial weights
+set.seed(10)
+n = 6 # Number of individuals
+
+mean_size_time_vect = c(4, 1) # Mean size of baby porcupine
+sigma_size_time_vect = c(1.5, 1) # Population variability
+rho = 0.2 # Correlation in intercept and slope
+R = matrix(c(1, rho, rho, 1), nrow=2, ncol=2)
+Sigma = diag(sigma_size_time_vect) %*% R %*% diag(sigma_size_time_vect)
+init_slope_vect = rmvnorm(n, mean_size_time_vect, Sigma)
+init_size = init_slope_vect[, 1] # Random effects
+time_effect = init_slope_vect[, 2] # Linear growth rate
+sigma_error = 0.5 # Measurement error
+
+# Simulate growth curves
+growth_curves = sapply(1:6, function(i) {
+					rnorm(length(weeks), init_size[i] + weeks*time_effect[i], sigma_error)
+				})
+
+# Format and plot curves
+growth_curves_dt = data.table(growth_curves)
+colnames(growth_curves_dt) = paste0("Porcupine", 1:n)
+growth_curves_dt$week = weeks
+pdat = as.data.frame(melt(growth_curves_dt, id.vars="week", value.name="weight_lb", variable.name="individual"))
+
+ggplot(pdat, aes(x=week, y=weight_lb, color=individual)) +
+ 				geom_point() + geom_line() + theme_classic() + xlab("weeks") +
+ 				ylab("weight (lb)")
+
+#ggsave("porcupine_growth.pdf", width=5, height=3)
+```
+
+# Visualize uncorrelated multi-variate normal
+
+```{r}
+library(patchwork)
+
+sims = 1000
+alpha0 = rnorm(sims, 0, sigma_size_time_vect[1])
+alpha1 = rnorm(sims, 0, sigma_size_time_vect[2])
+
+p1 = ggplot() + geom_point(aes(x=alpha0, y=alpha1))
+p2 = ggplot() + geom_density(aes(x=alpha0))
+p3 = ggplot() + geom_density(aes(x=alpha1))
+
+p1 + p2 + p3
+
+#ggsave("uncorrelated_assumption.pdf", width=6, height=2)
+```
+
+# Fit hierarchical porcupine models
+
+```{r}
+
+# Define the model
+pmod1 = alist(
+		weight_lb ~ dnorm(mu, sigma),
+		mu <- beta0 + alpha0[individual_id] + (beta1 + alpha1[individual_id])*week,
+		beta0 ~ dnorm(4, 3),
+		alpha0[individual_id] ~ dnorm(0, sigma_individual_int),
+		alpha1[individual_id] ~ dnorm(0, sigma_individual_slope),
+		beta1 ~ dnorm(0, 3),
+		sigma_individual_int ~ dexp(1),
+		sigma_individual_slope ~ dexp(1),
+		sigma ~ dexp(1)
+		)
+
+# Fit the model
+pdat$individual_id = coerce_index(as.factor(pdat$individual))
+stan_data = pdat[, c("individual_id", "weight_lb", "week" )]
+pmod1_fit = ulam(pmod1, data=stan_data, iter=2000, warmup=1000, chains=4, cores=4, log_lik=TRUE)
+
+# Convergence looks good
+traceplot(pmod1_fit, pars=paste0("alpha0[", 1:6, "]"))
+trankplot(pmod1_fit)
+precis(pmod1_fit, depth=2)
+```
+
+# Predicting observed porcupines
+
+```{r}
+
+# Get individual level predictions
+pred = link(pmod1_fit)
+dim(pred)
+
+# Summarize
+med_pred = apply(pred, 2, median)
+lower = apply(pred, 2, quantile, 0.025)
+upper = apply(pred, 2, quantile, 0.975)
+pdat$pred = med_pred
+pdat$lower = lower
+pdat$upper = upper
+
+# Plot
+ggplot(pdat) +
+ 				geom_point(aes(x=week, y=weight_lb, color=individual), alpha=0.4) + 
+ 				geom_line(aes(x=week, y=weight_lb, color=individual), alpha=0.4) + 
+ 				geom_line(aes(x=week, y=pred, color=individual)) +
+ 				geom_ribbon(aes(x=week, ymin=lower, ymax=upper, fill=individual), alpha=0.1) +
+ 				theme_classic() + xlab("weeks") +
+ 				ylab("weight (lb)")
+
+#ggsave("mean_predictions_porcupine.pdf", width=5, height=3)
+```
+
+# Examine additional model diagnostics
+
+```{r}
+resid = pdat$weight_lb - med_pred
+
+# QQplot to check normality
+df = data.frame(resid=resid, x=med_pred)
+p = ggplot(df, aes(sample = resid))
+pq = p + stat_qq() + stat_qq_line() + theme_classic()
+
+# Residual plot to check equal variance
+pr = ggplot(df, aes(x=x, y=resid)) + geom_point() + geom_hline(aes(yintercept=0), linetype="dashed") + xlab("Median prediction") + ylab("residual") + theme_classic()
+pq + pr
+ggsave("residual_plot.pdf", width=6, height=3)
+
+# Check normality of random effects
+
+alpha0 = apply(extract.samples(pmod1_fit)$alpha0, 2, quantile, 0.5)
+alpha1 = apply(extract.samples(pmod1_fit)$alpha1, 2, quantile, 0.5)
+p1 = ggplot(data=NULL,aes(sample = alpha0)) + stat_qq() + stat_qq_line() + theme_classic() + ggtitle("Random intercepts")
+p2 = ggplot(data=NULL,aes(sample = alpha1)) + stat_qq() + stat_qq_line() + theme_classic() + ggtitle("Random slopes")
+p1 + p2
+#ggsave("normality_of_random_effects.pdf", width=6, height=3)
+
+# Correlation of random effects
+
+ggplot(data=NULL, aes(x=alpha0, y=alpha1)) + geom_point() + geom_smooth(method="lm", se=FALSE) + theme_classic()
+
+#ggsave("ranef_correlations.pdf", width=4, height=3)
+```
+
+# Visualize correlated random effects
+
+```{r}
+library(patchwork)
+
+sims = 1000
+sigma_size_time_vect = c(1.5, 1) # Population variability
+rho = 0.2 # Correlation in intercept and slope
+R = matrix(c(1, rho, rho, 1), nrow=2, ncol=2)
+Sigma = diag(sigma_size_time_vect) %*% R %*% diag(sigma_size_time_vect)
+alpha_vect = rmvnorm(sims, c(0, 0), Sigma)
+alpha0 = alpha_vect[, 1]
+alpha1 = alpha_vect[, 2]
+
+p1 = ggplot() + geom_point(aes(x=alpha0, y=alpha1))
+p2 = ggplot() + geom_density(aes(x=alpha0))
+p3 = ggplot() + geom_density(aes(x=alpha1))
+
+p1 + p2 + p3
+
+#ggsave("correlated_assumption1.pdf", width=6, height=2)
+```
+
+```{r}
+library(patchwork)
+
+sims = 1000
+sigma_size_time_vect = c(1.5, 1) # Population variability
+rho = 0.7 # Correlation in intercept and slope
+R = matrix(c(1, rho, rho, 1), nrow=2, ncol=2)
+Sigma = diag(sigma_size_time_vect) %*% R %*% diag(sigma_size_time_vect)
+alpha_vect = rmvnorm(sims, c(0, 0), Sigma)
+alpha0 = alpha_vect[, 1]
+alpha1 = alpha_vect[, 2]
+
+p1 = ggplot() + geom_point(aes(x=alpha0, y=alpha1))
+p2 = ggplot() + geom_density(aes(x=alpha0))
+p3 = ggplot() + geom_density(aes(x=alpha1))
+
+p1 + p2 + p3
+
+#ggsave("correlated_assumption2.pdf", width=6, height=2)
+```
+
+# Compare predicted relationships from correlated vs. uncorrelated models
+
+```{r}
+
+Z = 6
+weeks = 0:10
+
+# No correlation prediction
+beta1_nocor = mean_size_time_vect[2]
+
+# Correlation prediction
+beta1_cor = mean_size_time_vect[2] + (sigma_size_time_vect[2] / sigma_size_time_vect[1])*0.2 * (Z - mean_size_time_vect[1])
+
+line1 = Z + beta1_nocor*weeks
+line2 = Z + beta1_cor*weeks
+
+ggplot() + geom_line(aes(x=weeks, y=line1, color="No correlation"), linewidth=2) + 
+	geom_line(aes(x=weeks, y=line2, color="With correlation"), linewidth=2) + 
+	theme_classic() + xlab("Weeks") + ylab("Weight (lbs)")
+
+#ggsave("compare_slopes.pdf", width=5, height=3)
+
+```
+
+# LKJ prior exploration
+
+```{r}
+
+# Sample 100 correlation matrices
+N = 10000
+R1 = rlkjcorr(N, K=2, eta=1) 
+R2 = rlkjcorr(N, K=2, eta=2)
+R10 = rlkjcorr(N, K=2, eta=10)
+
+R1[1, , ] 
+
+# K: Dimension of correlation matrix
+# eta: Prior 
+
+# Examine the distribution of rho
+ggplot() + geom_density(aes(x=R1[, 1, 2], color="eta = 1")) + 
+		   geom_density(aes(x=R2[, 1, 2], color="eta = 2")) +
+		   geom_density(aes(x=R10[, 1, 2], color="eta = 10")) + 
+		   theme_classic() +
+		   xlab("rho") + ylab("Density")
+
+#ggsave("lkj_prior.pdf", width=5, height=3)
+
+```
+
+# Fit the varying slopes model with correlation
+
+```{r}
+# Define the model
+pmod2 = alist(
+		weight_lb ~ dnorm(mu, sigma),
+		mu <- beta0 + alpha0[individual_id] + (beta1 + alpha1[individual_id])*week,
+		beta0 ~ dnorm(4, 3),
+		beta1 ~ dnorm(0, 3),
+		c(alpha0, alpha1)[individual_id] ~ multi_normal(c(0, 0), Rho, sigma_individual),
+		sigma_individual ~ dexp(1),
+		sigma ~ dexp(1),
+		Rho ~ lkj_corr(2)) # the 2 is the eta argument, not the dimension
+
+# Fit the model
+pdat$individual_id = coerce_index(as.factor(pdat$individual))
+stan_data = pdat[, c("individual_id", "weight_lb", "week" )]
+pmod2_fit = ulam(pmod2, data=stan_data, iter=2000, warmup=1000, chains=4, cores=4, log_lik=TRUE)
+
+# Convergence looks good
+traceplot(pmod2_fit, pars=paste0("alpha0[", 1:6, "]"))
+trankplot(pmod2_fit)
+precis(pmod2_fit, depth=2) # See depth = 3 for Rho matrices
+```
+
+## Get predictions
+
+```{r}
+
+# Get individual level predictions
+pred = link(pmod2_fit)
+dim(pred)
+
+# Summarize
+med_pred = apply(pred, 2, median)
+lower = apply(pred, 2, quantile, 0.025)
+upper = apply(pred, 2, quantile, 0.975)
+pdat$pred = med_pred
+pdat$lower = lower
+pdat$upper = upper
+
+# Plot
+ggplot(pdat) +
+ 				geom_point(aes(x=week, y=weight_lb, color=individual), alpha=0.4) + 
+ 				geom_line(aes(x=week, y=weight_lb, color=individual), alpha=0.4) + 
+ 				geom_line(aes(x=week, y=pred, color=individual)) +
+ 				geom_ribbon(aes(x=week, ymin=lower, ymax=upper, fill=individual), alpha=0.1) +
+ 				theme_classic() + xlab("weeks") +
+ 				ylab("weight (lb)")
+
+ggsave("mean_predictions_porcupine2.pdf", width=5, height=3)
+```
+
+## Extract the posterior distribution for rho
+
+```{r}
+post = extract.samples(pmod2_fit)
+rho = post$Rho[, 1, 2]
+prior_rho = rlkjcorr(N, K=2, eta=2)[, 1, 2]
+precis(rho)
+
+ggplot() + geom_density(aes(x=rho, color="posterior")) + 
+		   geom_density(aes(x=prior_rho, color="prior_rho")) +
+		   theme_classic()
+
+ggsave("rho_posterior.pdf", width=5, height=3)
+```
+
+# Challenge 1
+
+Compare variances
+
+```{r}
+ggplot() + geom_density(aes(x=post$sigma_individual[, 1], color="sigma_int")) +
+		   geom_density(aes(x=post$sigma_individual[, 2], color="sigma_slope")) +
+		   theme_classic() + xlab("sigma")
+
+ggsave("variance_posterior.pdf", width=5, height=3)
+
+quantile(post$sigma_individual[, 1], c(0.025, 0.5, 0.975))
+#    2.5%      50%    97.5% 
+#1.061287 1.689225 3.066331 
+quantile(post$sigma_individual[, 2], c(0.025, 0.5, 0.975))
+#     2.5%       50%     97.5% 
+#0.3616891 0.5838100 1.1897298 
+```
+
+Model comparison
+
+```{r}
+pmod3 = alist(
+		weight_lb ~ dnorm(mu, sigma),
+		mu <- beta0 + beta1*week,
+		beta0 ~ dnorm(4, 3),
+		beta1 ~ dnorm(0, 3),
+		sigma ~ dexp(1)
+		)
+
+# Define the model
+pmod4 = alist(
+		weight_lb ~ dnorm(mu, sigma),
+		mu <- beta0 + alpha0[individual_id] + (beta1)*week,
+		beta0 ~ dnorm(4, 3),
+		alpha0[individual_id] ~ dnorm(0, sigma_individual_int),
+		beta1 ~ dnorm(0, 3),
+		sigma_individual_int ~ dexp(1),
+		sigma ~ dexp(1)
+		)
+
+pdat$individual_id = coerce_index(as.factor(pdat$individual))
+stan_data = pdat[, c("individual_id", "weight_lb", "week" )]
+
+# Fit the models
+pmod3_fit = ulam(pmod3, data=stan_data, iter=2000, warmup=1000, chains=4, cores=4, log_lik=TRUE)
+
+pmod4_fit = ulam(pmod4, data=stan_data, iter=2000, warmup=1000, chains=4, cores=4, log_lik=TRUE)
+
+compare(pmod1_fit, pmod2_fit, pmod3_fit, pmod4_fit)
+```
+
+```{r}
+compare(pmod1_fit, pmod2_fit, pmod3_fit, pmod4_fit)
+```
+
+Strong evidence that both random effects were needed
+
+# Challenge 2
+
+```{r}
+compare(pmod1_fit, pmod2_fit)
+```
+
